@@ -1,15 +1,26 @@
 {
   "id": "./",
-  "name": "Eye Touch Link — হিসাব",
-  "short_name": "Eye Touch",
-  "description": "সহজ হিসাব, স্মার্ট জীবন",
+  "name": "আই টাচ্ লিংক — Eye Touch Link",
+  "short_name": "আই টাচ্ লিংক",
+  "description": "ব্যক্তিগত ও ব্যবসার হিসাব, আয়-ব্যয়, ধার-দেনা ও নিজের কিস্তি",
+  "lang": "bn-BD",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "background_color": "#f4f7f5",
   "theme_color": "#176b4d",
   "icons": [
-    {"src": "./icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
-    {"src": "./icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"}
+    {
+      "src": "./icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
   ]
 }

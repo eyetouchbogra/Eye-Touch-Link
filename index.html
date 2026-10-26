@@ -3,8 +3,9 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#176b4d">
-<title>Eye Touch Link — হিসাব</title>
+<title>আই টাচ্ লিংক — Eye Touch Link</title>
 <link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <style>
 :root{--g:#176b4d;--bg:#f4f7f5;--line:#dce6df;--red:#a5231b;--muted:#65756b}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:#17221d;font-family:system-ui,"Noto Sans Bengali",sans-serif}
@@ -25,10 +26,10 @@ button{border:0;border-radius:9px;background:var(--g);color:white;padding:10px 1
 </style>
 </head>
 <body><div class="app">
-<header class="top"><div class="brand"><div class="logo">৳</div><div><h1>Eye Touch Link</h1><p>ব্যক্তিগত ও ব্যবসার হিসাব • ব্যক্তিভিত্তিক লেজার</p></div></div>
-<div class="actions no-print"><span id="syncStatus" class="status">লোকাল মোড</span><button class="alt" id="backup">ব্যাকআপ</button><button id="csv">Excel/CSV</button></div></header>
+<header class="top"><div class="brand"><div class="logo">৳</div><div><h1>আই টাচ্ লিংক</h1><p>ব্যক্তিগত ও ব্যবসার হিসাব • ব্যক্তিভিত্তিক লেজার</p></div></div>
+<div class="actions no-print"><span id="syncStatus" class="status">লোকাল মোড</span><button class="alt" id="backup">ব্যাকআপ</button><button id="csv">এক্সেল/CSV</button></div></header>
 <nav class="tabs no-print">
-<button class="tab active" data-tab="home">ড্যাশবোর্ড</button><button class="tab" data-tab="entry">নতুন এন্ট্রি</button><button class="tab" data-tab="ledger">লেনদেন</button><button class="tab" data-tab="people">নামভিত্তিক হিসাব</button><button class="tab" data-tab="debts">ধার-দেনা</button><button class="tab" data-tab="reports">রিপোর্ট</button><button class="tab" data-tab="settings">সেটিংস/সিঙ্ক</button>
+<button class="tab active" data-tab="home">ড্যাশবোর্ড</button><button class="tab" data-tab="entry">নতুন এন্ট্রি</button><button class="tab" data-tab="ledger">লেনদেন</button><button class="tab" data-tab="people">নামভিত্তিক হিসাব</button><button class="tab" data-tab="debts">ধার-দেনা</button><button class="tab" data-tab="installments">আমার কিস্তি</button><button class="tab" data-tab="reports">রিপোর্ট</button><button class="tab" data-tab="settings">সেটিংস/সিঙ্ক</button>
 </nav>
 
 <section id="home" class="panel active">
@@ -41,7 +42,7 @@ button{border:0;border-radius:9px;background:var(--g);color:white;padding:10px 1
 <section id="entry" class="panel"><div class="box"><h2 id="entryTitle">নতুন আয়/খরচ যোগ করুন</h2><form id="ef"><input id="eid" type="hidden"><div class="form">
 <div class="field"><label>তারিখ</label><input type="date" id="ed" required></div><div class="field"><label>ধরন</label><select id="et"><option value="income">আয়</option><option value="expense">খরচ</option></select></div><div class="field"><label>হিসাব</label><select id="es"><option value="personal">ব্যক্তিগত</option><option value="business">ব্যবসা</option></select></div>
 <div class="field"><label>ব্যক্তি/কাস্টমারের নাম</label><input id="eperson" list="knownNames" maxlength="100" placeholder="নতুন বা আগের নাম লিখুন"><datalist id="knownNames"></datalist></div><div class="field"><label>মোবাইল (ঐচ্ছিক)</label><input id="ephone" maxlength="30" placeholder="মোবাইল নম্বর"></div><div class="field"><label>খাত</label><input id="ec" required maxlength="60" placeholder="যেমন: খাবার, বিক্রি"></div>
-<div class="field"><label>টাকার পরিমাণ (৳)</label><input type="number" id="ea" min=".01" step=".01" required></div><div class="field"><label>মাধ্যম</label><select id="em"><option>Cash</option><option>Bank</option><option>bKash</option><option>Nagad</option><option>Other</option></select></div><div class="field"><label>বিবরণ</label><input id="edesc" maxlength="300"></div>
+<div class="field"><label>টাকার পরিমাণ (৳)</label><input type="number" id="ea" min=".01" step=".01" required></div><div class="field"><label>মাধ্যম</label><select id="em"><option value="Cash">নগদ</option><option value="Bank">ব্যাংক</option><option value="bKash">বিকাশ</option><option value="Nagad">নগদ (Nagad)</option><option value="Other">অন্যান্য</option></select></div><div class="field"><label>বিবরণ</label><input id="edesc" maxlength="300"></div>
 </div><p><button type="submit" id="saveEntry">হিসাব সংরক্ষণ</button> <button type="button" class="alt" id="cancelEntry">ফাঁকা করুন</button></p></form></div></section>
 
 <section id="ledger" class="panel"><div class="box"><div class="sectionhead"><h2>সব লেনদেন</h2><button class="alt" data-goto="entry">নতুন এন্ট্রি</button></div>
@@ -56,6 +57,20 @@ button{border:0;border-radius:9px;background:var(--g);color:white;padding:10px 1
 </div><p><button type="submit" id="saveDebt">ধার সংরক্ষণ</button> <button type="button" class="alt" id="cancelDebt">ফাঁকা করুন</button></p></form></div>
 <div class="box"><h2>ধার-দেনার তালিকা ও আংশিক ফেরত</h2><div class="filters"><input id="dq" placeholder="নাম/মোবাইল খুঁজুন"><select id="dstatus"><option value="all">সব অবস্থা</option><option value="open">বাকি আছে</option><option value="paid">পরিশোধিত</option></select></div><div id="dt"></div></div></section>
 
+<section id="installments" class="panel">
+<div class="box"><h2 id="instTitle">নিজের কিস্তির হিসাব যোগ করুন</h2><p class="muted">আপনি যে কিস্তি নিজে পরিশোধ করবেন তার মোট টাকা, ইচ্ছামতো নির্ধারিত তারিখ এবং প্রতিটি পরিশোধের ইতিহাস রাখুন। কিস্তির সময়সূচি বাধ্যতামূলকভাবে সাপ্তাহিক/মাসিক নয়—প্রতিটি কিস্তির তারিখ আলাদাভাবে দিতে পারবেন।</p>
+<form id="if"><input id="iid" type="hidden"><div class="form">
+<div class="field"><label>কিস্তির নাম / ঋণদাতা</label><input id="iname" required maxlength="100" placeholder="যেমন: ফ্রিজের কিস্তি / ব্যাংক"></div>
+<div class="field"><label>মোট কিস্তির টাকা (৳)</label><input id="itotal" type="number" min=".01" step=".01" required></div>
+<div class="field"><label>শুরুর তারিখ</label><input id="istart" type="date" required></div>
+<div class="field"><label>মোট কিস্তির সংখ্যা (ঐচ্ছিক)</label><input id="icount" type="number" min="1" step="1" placeholder="যেমন: ১২"></div>
+<div class="field"><label>প্রতি কিস্তির নির্ধারিত টাকা (ঐচ্ছিক)</label><input id="iamount" type="number" min=".01" step=".01" placeholder="তারিখভেদে ভিন্ন হলে ফাঁকা রাখুন"></div>
+<div class="field"><label>পরবর্তী নির্ধারিত তারিখ (ঐচ্ছিক)</label><input id="inext" type="date"></div>
+<div class="field wide"><label>নোট</label><textarea id="inote" rows="2" maxlength="300" placeholder="চুক্তি/কিস্তি সম্পর্কে নোট"></textarea></div>
+</div><p><button type="submit" id="saveInst">কিস্তির হিসাব সংরক্ষণ</button> <button type="button" class="alt" id="cancelInst">ফাঁকা করুন</button></p></form></div>
+<div class="box"><div class="sectionhead"><h2>আমার কিস্তির তালিকা</h2><select id="istatus"><option value="all">সব অবস্থা</option><option value="open">বাকি আছে</option><option value="paid">সম্পূর্ণ পরিশোধিত</option></select></div><div id="instSummary" class="cards"></div><div id="instTable"></div></div>
+<div class="box"><h3>কিস্তি পরিশোধের ইতিহাস</h3><p class="muted">তালিকায় কোনো কিস্তির পাশে “টাকা জমা” চাপলে পরিশোধের পরিমাণ ও তারিখ যোগ হবে। আংশিক পরিশোধও সমর্থিত।</p><div id="instHistory"></div></div>
+</section>
 <section id="reports" class="panel"><div class="box"><div class="sectionhead"><h2>মাসিক রিপোর্ট</h2><input type="month" id="rm"></div><div id="rc"></div><p class="no-print"><button id="pdf">PDF / প্রিন্ট</button> <button class="alt" id="rcsv">রিপোর্ট CSV</button></p></div></section>
 
 <section id="settings" class="panel">
@@ -70,20 +85,44 @@ button{border:0;border-radius:9px;background:var(--g);color:white;padding:10px 1
 </section>
 <div class="footer">Eye Touch Link • Ledger v2</div></div>
 
-<div id="pinOverlay" style="display:none;position:fixed;inset:0;z-index:9999;background:#f4f7f5;align-items:center;justify-content:center;padding:20px"><div style="background:white;border:1px solid #dce6df;border-radius:18px;padding:24px;width:min(100%,360px);text-align:center"><div style="font-size:34px;color:#176b4d">🔒</div><h2>Eye Touch Link</h2><p id="pinMsg">অ্যাপ খুলতে PIN দিন</p><input id="pinInput" type="password" inputmode="numeric" maxlength="8" placeholder="৪–৮ সংখ্যার PIN" style="width:100%;padding:13px;border:1px solid #cbd8cf;border-radius:10px;font-size:20px;text-align:center;letter-spacing:5px"><button id="pinUnlock" style="width:100%;margin-top:12px">আনলক</button><p id="pinErr" style="color:#b42318;font-size:13px"></p></div></div>
+<div id="pinOverlay" style="display:none;position:fixed;inset:0;z-index:9999;background:#f4f7f5;align-items:center;justify-content:center;padding:20px"><div style="background:white;border:1px solid #dce6df;border-radius:18px;padding:24px;width:min(100%,360px);text-align:center"><div style="font-size:34px;color:#176b4d">🔒</div><h2>আই টাচ্ লিংক</h2><p id="pinMsg">অ্যাপ খুলতে PIN দিন</p><input id="pinInput" type="password" inputmode="numeric" maxlength="8" placeholder="৪–৮ সংখ্যার PIN" style="width:100%;padding:13px;border:1px solid #cbd8cf;border-radius:10px;font-size:20px;text-align:center;letter-spacing:5px"><button id="pinUnlock" style="width:100%;margin-top:12px">আনলক</button><p id="pinErr" style="color:#b42318;font-size:13px"></p></div></div>
 <script>
 const K='itouchlink_v1', CLOUD='itouchlink_cloud_config_v1', PINKEY='itouchlink_pin_hash_v1';
-let D={entries:[],debts:[]}, sb=null, user=null, syncBusy=false;
+let D={entries:[],debts:[],installments:[]}, sb=null, user=null, syncBusy=false, syncPending=false;
 const $=id=>document.getElementById(id), today=()=>new Date().toLocaleDateString('en-CA'), mon=()=>today().slice(0,7);
 const uid=()=>crypto.randomUUID?crypto.randomUUID():String(Date.now())+Math.random().toString(16).slice(2);
+function validDate(v,optional=false){if(optional&&!v)return true;if(!/^\d{4}-\d{2}-\d{2}$/.test(String(v||'')))return false;const d=new Date(v+'T00:00:00Z');return !Number.isNaN(d.getTime())&&d.toISOString().slice(0,10)===v}
+function requireDate(v,label,optional=false){if(!validDate(v,optional)){alert(label+' সঠিক তারিখ দিন (YYYY-MM-DD)');return false}return true}
 function esc(s){return String(s??'—').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function money(n){return '৳ '+Number(n||0).toLocaleString('bn-BD',{maximumFractionDigits:2})}
 function scopeName(s){return s==='business'?'ব্যবসা':'ব্যক্তিগত'}
 function empty(){return '<div class="empty">কোনো রেকর্ড নেই।</div>'}
 function tbl(head,rows){return rows.length?'<div class="tablewrap"><table><thead><tr>'+head.map(x=>'<th>'+x+'</th>').join('')+'</tr></thead><tbody>'+rows.join('')+'</tbody></table></div>':empty()}
 function remaining(d){return Math.max(0,Number(d.amount||0)-(d.payments||[]).reduce((s,p)=>s+Number(p.amount||0),0))}
-function normalise(d){d=d||{};return {entries:(Array.isArray(d.entries)?d.entries:[]).map(e=>({...e,id:String(e.id??uid()),person:e.person||'',phone:e.phone||''})),debts:(Array.isArray(d.debts)?d.debts:[]).map(x=>({...x,id:String(x.id??uid()),phone:x.phone||'',payments:Array.isArray(x.payments)?x.payments:[]}))}}
-function load(){try{const old=JSON.parse(localStorage.getItem(K)||'null');if(old&&Array.isArray(old.entries)&&Array.isArray(old.debts))D=normalise(old)}catch(e){console.warn(e)}}
+function normalise(d){d=d||{};return {entries:(Array.isArray(d.entries)?d.entries:[]).map(e=>({...e,id:String(e.id??uid()),person:e.person||'',phone:e.phone||''})),debts:(Array.isArray(d.debts)?d.debts:[]).map(x=>({...x,id:String(x.id??uid()),phone:x.phone||'',payments:Array.isArray(x.payments)?x.payments:[]})),installments:(Array.isArray(d.installments)?d.installments:[]).map(x=>({...x,id:String(x.id??uid()),payments:Array.isArray(x.payments)?x.payments:[]}))}}
+function load(){
+  // Prefer the known app key. If it is absent/invalid, look only at likely legacy ledger keys.
+  // Source keys are deliberately preserved; migration copies data and never deletes the original.
+  const valid=d=>d&&typeof d==='object'&&(Array.isArray(d.entries)||Array.isArray(d.debts)||Array.isArray(d.installments));
+  try{
+    const current=JSON.parse(localStorage.getItem(K)||'null');
+    if(valid(current)){D=normalise(current);return}
+  }catch(e){console.warn('Current ledger data could not be parsed; checking legacy keys without deleting anything.',e)}
+  const likelyKey=/(eye.?touch|itouch|ledger|hisab|hishab|account.?book|খাতা|হিসাব)/i;
+  for(let i=0;i<localStorage.length;i++){
+    const key=localStorage.key(i); if(!key||key===K||!likelyKey.test(key))continue;
+    try{
+      const candidate=JSON.parse(localStorage.getItem(key)||'null');
+      const data=candidate&&candidate.data&&valid(candidate.data)?candidate.data:candidate;
+      if(valid(data)){
+        D=normalise(data); saveLocal();
+        console.info('Ledger data copied from legacy storage key:',key,'Original key preserved.');
+        alert('আগের হিসাবের ডেটা পাওয়া গেছে এবং নতুন অ্যাপে কপি করা হয়েছে। পুরোনো ডেটার কপিও অক্ষত রাখা হয়েছে। এখনই JSON ব্যাকআপ ডাউনলোড করে রাখুন।');
+        return;
+      }
+    }catch(e){/* Ignore unrelated or malformed localStorage entries without changing them. */}
+  }
+}
 function saveLocal(){localStorage.setItem(K,JSON.stringify(D))}
 function save(){saveLocal();render();if(sb&&user)syncCloud(false)}
 function download(name,content,type){const u=URL.createObjectURL(new Blob([content],{type})),a=document.createElement('a');a.href=u;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(u),1000)}
@@ -107,27 +146,45 @@ function renderPeople(){
 }
 function renderDebts(){let q=$('dq').value.trim().toLowerCase(),status=$('dstatus').value;let a=[...D.debts].filter(d=>(!q||[d.person,d.phone,d.description].join(' ').toLowerCase().includes(q))&&(status==='all'||(status==='paid'?remaining(d)<=0:remaining(d)>0))).sort((a,b)=>b.date.localeCompare(a.date));let rows=a.map(d=>'<tr><td>'+esc(d.date)+'</td><td><span class="pill debt">'+(d.direction==='lent'?'ধার দিয়েছি':'ধার নিয়েছি')+'</span></td><td>'+scopeName(d.scope)+'</td><td>'+esc(d.person)+(d.phone?'<br><small>'+esc(d.phone)+'</small>':'')+'</td><td>'+money(d.amount)+'</td><td>'+money((d.payments||[]).reduce((n,p)=>n+Number(p.amount),0))+'</td><td><b>'+money(remaining(d))+'</b></td><td>'+esc(d.due||'—')+'</td><td>'+(remaining(d)<=0?'পরিশোধিত':'বাকি')+'</td><td><button class="small" data-pay="'+esc(d.id)+'">টাকা ফেরত</button> <button class="small" data-edit-debt="'+esc(d.id)+'">এডিট</button> <button class="small del" data-del-debt="'+esc(d.id)+'">মুছুন</button></td></tr>');$('dt').innerHTML=tbl(['তারিখ','ধরন','হিসাব','ব্যক্তি','মোট','ফেরত','বাকি','ফেরতের তারিখ','অবস্থা','অ্যাকশন'],rows)}
 function renderReport(){let m=$('rm').value||mon(),a=D.entries.filter(e=>e.date.startsWith(m)),i=a.filter(e=>e.type==='income').reduce((n,e)=>n+ +e.amount,0),o=a.filter(e=>e.type==='expense').reduce((n,e)=>n+ +e.amount,0),d=D.debts.filter(x=>x.date.startsWith(m)),l=d.filter(x=>x.direction==='lent').reduce((n,x)=>n+ +x.amount,0),b=d.filter(x=>x.direction==='borrowed').reduce((n,x)=>n+ +x.amount,0);let breakdown=['personal','business'].map(s=>{let z=a.filter(e=>e.scope===s),ii=z.filter(e=>e.type==='income').reduce((n,e)=>n+ +e.amount,0),oo=z.filter(e=>e.type==='expense').reduce((n,e)=>n+ +e.amount,0);return '<div class="rline"><span>'+scopeName(s)+' — আয়</span><b class="green">'+money(ii)+'</b></div><div class="rline"><span>'+scopeName(s)+' — খরচ</span><b class="red">'+money(oo)+'</b></div><div class="rline"><span>'+scopeName(s)+' — নিট</span><b>'+money(ii-oo)+'</b></div>'}).join('');$('rc').innerHTML='<h3>'+esc(m)+' মাসের সারাংশ</h3><div class="cards"><div class="card"><div class="metric">মোট আয়</div><div class="amount green">'+money(i)+'</div></div><div class="card"><div class="metric">মোট খরচ</div><div class="amount red">'+money(o)+'</div></div><div class="card"><div class="metric">নিট ব্যালান্স</div><div class="amount">'+money(i-o)+'</div></div><div class="card"><div class="metric">ধার দেওয়া−নেওয়া</div><div class="amount amber">'+money(l-b)+'</div></div></div><div class="reportgrid"><div class="box"><h3>ব্যক্তিগত/ব্যবসা</h3>'+breakdown+'</div><div class="box"><h3>এই মাসের ধার</h3><div class="rline"><span>ধার দিয়েছেন (মূল টাকা)</span><b>'+money(l)+'</b></div><div class="rline"><span>ধার নিয়েছেন (মূল টাকা)</span><b>'+money(b)+'</b></div></div></div><h3>এই মাসের লেনদেন</h3>'+tbl(['তারিখ','ধরন','হিসাব','নাম','খাত','বিবরণ','মাধ্যম','পরিমাণ'],entryRows(a,false))}
-function render(){renderHome();renderLedger();renderPeople();renderDebts();renderReport()}
+function instPaid(x){return (x.payments||[]).reduce((n,p)=>n+Number(p.amount||0),0)}
+function instLeft(x){return Math.max(0,Number(x.total||0)-instPaid(x))}
+function renderInstallments(){
+ const status=$('istatus').value; const all=[...D.installments].filter(x=>status==='all'||(status==='paid'?instLeft(x)<=0:instLeft(x)>0)).sort((a,b)=>(a.nextDate||a.startDate||'').localeCompare(b.nextDate||b.startDate||''));
+ const total=D.installments.reduce((n,x)=>n+Number(x.total||0),0),paid=D.installments.reduce((n,x)=>n+instPaid(x),0),left=Math.max(0,total-paid);
+ $('instSummary').innerHTML='<div class="card"><div class="metric">মোট কিস্তির দায়</div><div class="amount">'+money(total)+'</div></div><div class="card"><div class="metric">পরিশোধ হয়েছে</div><div class="amount green">'+money(paid)+'</div></div><div class="card"><div class="metric">বাকি আছে</div><div class="amount red">'+money(left)+'</div></div><div class="card"><div class="metric">চলমান কিস্তি</div><div class="amount">'+D.installments.filter(x=>instLeft(x)>0).length+'</div></div>';
+ let rows=all.map(x=>'<tr><td>'+esc(x.name)+'</td><td>'+esc(x.startDate||'—')+'</td><td>'+money(x.total)+'</td><td>'+money(instPaid(x))+'</td><td><b>'+money(instLeft(x))+'</b></td><td>'+esc(x.count||'—')+'</td><td>'+esc(x.nextDate||'—')+'</td><td>'+(instLeft(x)<=0?'<span class="pill in">সম্পূর্ণ</span>':'<span class="pill debt">চলমান</span>')+'</td><td><button class="small" data-inst-pay="'+esc(x.id)+'">টাকা জমা</button> <button class="small" data-inst-edit="'+esc(x.id)+'">এডিট</button> <button class="small del" data-inst-del="'+esc(x.id)+'">মুছুন</button></td></tr>');
+ $('instTable').innerHTML=tbl(['কিস্তি / ঋণদাতা','শুরু','মোট টাকা','জমা','বাকি','কিস্তি সংখ্যা','পরবর্তী তারিখ','অবস্থা','অ্যাকশন'],rows);
+ let hist=[];D.installments.forEach(x=>(x.payments||[]).forEach((p,i)=>hist.push({instId:x.id,payId:p.id||'',name:x.name,date:p.date,amount:p.amount,method:p.method||'—',note:p.note||'',fallbackIndex:i})));hist.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+ // Keep the parent and payment IDs with each history row. Matching by name/date/amount can target the wrong record when payments are duplicated.
+ $('instHistory').innerHTML=tbl(['তারিখ','কিস্তি / ঋণদাতা','পরিমাণ','মাধ্যম','নোট','অ্যাকশন'],hist.map(p=>{let token=esc(p.instId)+'|'+esc(p.payId)+'|'+esc(p.date||'')+'|'+esc(p.amount);return '<tr><td>'+esc(p.date||'—')+'</td><td>'+esc(p.name)+'</td><td class="green">'+money(p.amount)+'</td><td>'+esc(p.method)+'</td><td>'+esc(p.note||'—')+'</td><td><button class="small" data-edit-inst-payment="'+token+'">এডিট</button> <button class="small del" data-del-inst-payment="'+token+'">মুছুন</button></td></tr>'}));
+}
+function resetInst(){$('if').reset();$('iid').value='';$('istart').value=today();$('inext').value='';$('instTitle').textContent='নিজের কিস্তির হিসাব যোগ করুন';$('saveInst').textContent='কিস্তির হিসাব সংরক্ষণ'}
+function render(){renderHome();renderLedger();renderPeople();renderDebts();renderInstallments();renderReport()}
 function resetEntry(){ $('ef').reset();$('eid').value='';$('ed').value=today();$('entryTitle').textContent='নতুন আয়/খরচ যোগ করুন';$('saveEntry').textContent='হিসাব সংরক্ষণ'}
 function resetDebt(){ $('df').reset();$('did').value='';$('dd').value=today();$('debtTitle').textContent='ধার-দেনা যোগ করুন';$('saveDebt').textContent='ধার সংরক্ষণ'}
-$('ef').onsubmit=e=>{e.preventDefault();let id=$('eid').value,rec={id:id||uid(),date:$('ed').value,type:$('et').value,scope:$('es').value,person:$('eperson').value.trim(),phone:$('ephone').value.trim(),category:$('ec').value.trim(),amount:+$('ea').value,method:$('em').value,description:$('edesc').value.trim()};if(id){D.entries=D.entries.map(x=>x.id===id?rec:x)}else D.entries.push(rec);save();resetEntry();alert(id?'এন্ট্রি আপডেট হয়েছে':'হিসাব সংরক্ষণ হয়েছে');tab('home')};
-$('df').onsubmit=e=>{e.preventDefault();let id=$('did').value,existing=D.debts.find(x=>x.id===id),rec={id:id||uid(),date:$('dd').value,direction:$('dir').value,scope:$('ds').value,person:$('dp').value.trim(),phone:$('dphone').value.trim(),amount:+$('da').value,due:$('due').value,description:$('ddesc').value.trim(),payments:existing?.payments||[]};if((rec.payments||[]).reduce((s,p)=>s+Number(p.amount),0)>rec.amount){alert('মোট টাকা ফেরতের চেয়ে কম হতে পারবে না');return}if(id)D.debts=D.debts.map(x=>x.id===id?rec:x);else D.debts.push(rec);save();resetDebt();alert(id?'ধারের তথ্য আপডেট হয়েছে':'ধার-দেনা সংরক্ষণ হয়েছে')};
+$('ef').onsubmit=e=>{e.preventDefault();if(!requireDate($('ed').value,'হিসাবের'))return;let id=$('eid').value,rec={id:id||uid(),date:$('ed').value,type:$('et').value,scope:$('es').value,person:$('eperson').value.trim(),phone:$('ephone').value.trim(),category:$('ec').value.trim(),amount:+$('ea').value,method:$('em').value,description:$('edesc').value.trim()};if(id){D.entries=D.entries.map(x=>x.id===id?rec:x)}else D.entries.push(rec);save();resetEntry();alert(id?'এন্ট্রি আপডেট হয়েছে':'হিসাব সংরক্ষণ হয়েছে');tab('home')};
+$('df').onsubmit=e=>{e.preventDefault();if(!requireDate($('dd').value,'ধারের')||!requireDate($('due').value,'ফেরতের',true))return;let id=$('did').value,existing=D.debts.find(x=>x.id===id),rec={id:id||uid(),date:$('dd').value,direction:$('dir').value,scope:$('ds').value,person:$('dp').value.trim(),phone:$('dphone').value.trim(),amount:+$('da').value,due:$('due').value,description:$('ddesc').value.trim(),payments:existing?.payments||[]};if((rec.payments||[]).reduce((s,p)=>s+Number(p.amount),0)>rec.amount){alert('মোট টাকা ফেরতের চেয়ে কম হতে পারবে না');return}if(id)D.debts=D.debts.map(x=>x.id===id?rec:x);else D.debts.push(rec);save();resetDebt();alert(id?'ধারের তথ্য আপডেট হয়েছে':'ধার-দেনা সংরক্ষণ হয়েছে')};
+$('if').onsubmit=e=>{e.preventDefault();if(!requireDate($('istart').value,'কিস্তি শুরুর')||!requireDate($('inext').value,'পরবর্তী কিস্তির',true))return;let id=$('iid').value,old=D.installments.find(x=>x.id===id),rec={id:id||uid(),name:$('iname').value.trim(),total:Number($('itotal').value),startDate:$('istart').value,count:$('icount').value?Number($('icount').value):'',installmentAmount:$('iamount').value?Number($('iamount').value):'',nextDate:$('inext').value,note:$('inote').value.trim(),payments:old?.payments||[]};if(instPaid(rec)>rec.total){alert('আগে জমা দেওয়া টাকা মোট কিস্তির চেয়ে বেশি হতে পারবে না');return}if(id)D.installments=D.installments.map(x=>x.id===id?rec:x);else D.installments.push(rec);save();resetInst();alert(id?'কিস্তির তথ্য আপডেট হয়েছে':'কিস্তির হিসাব সংরক্ষণ হয়েছে')};
+$('cancelInst').onclick=resetInst;
 $('cancelEntry').onclick=resetEntry;$('cancelDebt').onclick=resetDebt;
 document.addEventListener('click',e=>{let t=e.target.closest('[data-tab]');if(t)tab(t.dataset.tab);let g=e.target.closest('[data-goto]');if(g)tab(g.dataset.goto);
 let ee=e.target.closest('[data-edit-entry]');if(ee){let x=D.entries.find(v=>v.id===ee.dataset.editEntry);if(!x)return;$('eid').value=x.id;$('ed').value=x.date;$('et').value=x.type;$('es').value=x.scope;$('eperson').value=x.person||'';$('ephone').value=x.phone||'';$('ec').value=x.category;$('ea').value=x.amount;$('em').value=x.method||'Cash';$('edesc').value=x.description||'';$('entryTitle').textContent='এন্ট্রি সম্পাদনা';$('saveEntry').textContent='পরিবর্তন সংরক্ষণ';tab('entry')}
 let de=e.target.closest('[data-del-entry]');if(de&&confirm('এই এন্ট্রি মুছবেন?')){D.entries=D.entries.filter(x=>x.id!==de.dataset.delEntry);save()}
 let ed=e.target.closest('[data-edit-debt]');if(ed){let x=D.debts.find(v=>v.id===ed.dataset.editDebt);if(!x)return;$('did').value=x.id;$('dd').value=x.date;$('dir').value=x.direction;$('ds').value=x.scope;$('dp').value=x.person;$('dphone').value=x.phone||'';$('da').value=x.amount;$('due').value=x.due||'';$('ddesc').value=x.description||'';$('debtTitle').textContent='ধার সম্পাদনা';$('saveDebt').textContent='পরিবর্তন সংরক্ষণ';tab('debts');window.scrollTo(0,0)}
 let dd=e.target.closest('[data-del-debt]');if(dd&&confirm('এই ধার-দেনার রেকর্ড এবং তার ফেরত-তথ্য মুছবেন?')){D.debts=D.debts.filter(x=>x.id!==dd.dataset.delDebt);save()}
-let pp=e.target.closest('[data-pay]');if(pp){let x=D.debts.find(v=>v.id===pp.dataset.pay);if(!x)return;let left=remaining(x);if(left<=0){alert('এই ধার সম্পূর্ণ পরিশোধিত');return}let amount=prompt('এখন কত টাকা ফেরত/পরিশোধ হয়েছে? বাকি: '+left);if(amount===null)return;amount=Number(amount);if(!Number.isFinite(amount)||amount<=0||amount>left){alert('সঠিক পরিমাণ লিখুন (সর্বোচ্চ '+left+')');return}let date=prompt('ফেরতের তারিখ YYYY-MM-DD লিখুন',today());if(date===null)return;x.payments=x.payments||[];x.payments.push({id:uid(),date,amount});save();alert('ফেরতের টাকা যোগ হয়েছে')}
+let pp=e.target.closest('[data-pay]');if(pp){let x=D.debts.find(v=>v.id===pp.dataset.pay);if(!x)return;let left=remaining(x);if(left<=0){alert('এই ধার সম্পূর্ণ পরিশোধিত');return}let amount=prompt('এখন কত টাকা ফেরত/পরিশোধ হয়েছে? বাকি: '+left);if(amount===null)return;amount=Number(amount);if(!Number.isFinite(amount)||amount<=0||amount>left){alert('সঠিক পরিমাণ লিখুন (সর্বোচ্চ '+left+')');return}let date=prompt('ফেরতের তারিখ YYYY-MM-DD লিখুন',today());if(date===null)return;if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||Number.isNaN(Date.parse(date))||new Date(date+'T00:00:00Z').toISOString().slice(0,10)!==date){alert('সঠিক তারিখ YYYY-MM-DD ফরম্যাটে দিন');return}x.payments=x.payments||[];x.payments.push({id:uid(),date,amount});save();alert('ফেরতের টাকা যোগ হয়েছে')}
+let ip=e.target.closest('[data-inst-pay]');if(ip){let x=D.installments.find(v=>v.id===ip.dataset.instPay);if(!x)return;let left=instLeft(x);if(left<=0){alert('এই কিস্তি সম্পূর্ণ পরিশোধিত');return}let amount=prompt('কত টাকা পরিশোধ করেছেন? বাকি: '+left);if(amount===null)return;amount=Number(amount);if(!Number.isFinite(amount)||amount<=0||amount>left){alert('সঠিক পরিমাণ লিখুন (সর্বোচ্চ '+left+')');return}let date=prompt('পরিশোধের তারিখ YYYY-MM-DD',today());if(date===null)return;if(!validDate(date)){alert('সঠিক তারিখ YYYY-MM-DD ফরম্যাটে দিন');return}let method=prompt('মাধ্যম (নগদ/বিকাশ/নগদ অ্যাপ/ব্যাংক/অন্যান্য)','নগদ');if(method===null)return;let note=prompt('নোট (ঐচ্ছিক)','')||'';x.payments=x.payments||[];x.payments.push({id:uid(),date,amount,method,note});if(x.nextDate===date)x.nextDate='';save();alert('কিস্তির পরিশোধ সংরক্ষণ হয়েছে')}
+let epi=e.target.closest('[data-edit-inst-payment]');if(epi){let [iid,pid,pdate,pamount]=epi.dataset.editInstPayment.split('|');let inst=D.installments.find(v=>v.id===iid);if(!inst)return;let pay=(inst.payments||[]).find(v=>pid&&v.id===pid);if(!pay)pay=(inst.payments||[]).find(v=>v.date===pdate&&Number(v.amount)===Number(pamount));if(!pay)return;let amount=prompt('সংশোধিত পরিশোধের পরিমাণ লিখুন',String(pay.amount));if(amount===null)return;amount=Number(amount);if(!Number.isFinite(amount)||amount<=0||instPaid(inst)-Number(pay.amount)+amount>Number(inst.total)){alert('পরিমাণ সঠিক নয় বা মোট কিস্তির চেয়ে বেশি হচ্ছে');return}let date=prompt('সংশোধিত তারিখ YYYY-MM-DD',pay.date);if(date===null)return;if(!validDate(date)){alert('সঠিক তারিখ YYYY-MM-DD ফরম্যাটে দিন');return}let method=prompt('মাধ্যম',pay.method||'Cash');if(method===null)return;let note=prompt('নোট',pay.note||'');if(note===null)return;pay.amount=amount;pay.date=date;pay.method=method;pay.note=note;save();alert('পরিশোধের তথ্য সংশোধন হয়েছে');return}let dpi=e.target.closest('[data-del-inst-payment]');if(dpi){if(!confirm('এই কিস্তির পরিশোধের রেকর্ড মুছবেন?'))return;let [iid,pid,pdate,pamount]=dpi.dataset.delInstPayment.split('|');let inst=D.installments.find(v=>v.id===iid);if(!inst)return;let ix=(inst.payments||[]).findIndex(v=>pid&&v.id===pid);if(ix<0)ix=(inst.payments||[]).findIndex(v=>v.date===pdate&&Number(v.amount)===Number(pamount));if(ix<0)return;inst.payments.splice(ix,1);save();alert('পরিশোধের রেকর্ড মুছে ফেলা হয়েছে');return}let ie=e.target.closest('[data-inst-edit]');if(ie){let x=D.installments.find(v=>v.id===ie.dataset.instEdit);if(!x)return;$('iid').value=x.id;$('iname').value=x.name;$('itotal').value=x.total;$('istart').value=x.startDate||today();$('icount').value=x.count||'';$('iamount').value=x.installmentAmount||'';$('inext').value=x.nextDate||'';$('inote').value=x.note||'';$('instTitle').textContent='কিস্তির তথ্য সম্পাদনা';$('saveInst').textContent='পরিবর্তন সংরক্ষণ';tab('installments');window.scrollTo(0,0)}
+let ix=e.target.closest('[data-inst-del]');if(ix&&confirm('এই কিস্তির হিসাব ও পরিশোধের ইতিহাস মুছবেন?')){D.installments=D.installments.filter(x=>x.id!==ix.dataset.instDel);save()}
 let person=e.target.closest('[data-person]');if(person){$('pq').value=person.dataset.person;renderPeople();tab('people')}
 });
-['fromDate','toDate','fs','ft','fq','homeScope','rm','pq','pfrom','pto','dq','dstatus'].forEach(id=>$(id).addEventListener('input',render));
+['fromDate','toDate','fs','ft','fq','homeScope','rm','pq','pfrom','pto','dq','dstatus','istatus'].forEach(id=>$(id).addEventListener('input',render));
 $('pdf').onclick=()=>print();
-$('rcsv').onclick=()=>{let m=$('rm').value,a=D.entries.filter(e=>e.date.startsWith(m)),ds=D.debts.filter(e=>e.date.startsWith(m));csv([['Month',m],['Date','Type','Scope','Person','Phone','Category','Amount BDT','Method','Description'],...a.map(e=>[e.date,e.type,e.scope,e.person,e.phone,e.category,e.amount,e.method,e.description]),...ds.map(d=>[d.date,d.direction,d.scope,d.person,d.phone,'Debt',d.amount,'',d.description]),...ds.flatMap(d=>(d.payments||[]).map(p=>[p.date,'repayment-'+d.direction,d.scope,d.person,d.phone,'Debt repayment',p.amount,'',d.description]))],'eye-touch-report-'+m+'.csv')};
-$('csv').onclick=()=>csv([['Date','Type','Scope','Person','Phone','Category','Amount BDT','Method','Description'],...D.entries.map(e=>[e.date,e.type,e.scope,e.person,e.phone,e.category,e.amount,e.method,e.description]),...D.debts.flatMap(d=>[[d.date,d.direction,d.scope,d.person,d.phone,'Debt principal',d.amount,'',d.description],...(d.payments||[]).map(p=>[p.date,'repayment-'+d.direction,d.scope,d.person,d.phone,'Debt repayment',p.amount,'',d.description])])],'eye-touch-link-export.csv');
+$('rcsv').onclick=()=>{let m=$('rm').value,a=D.entries.filter(e=>e.date.startsWith(m)),ds=D.debts.filter(e=>e.date.startsWith(m));csv([['মাস',m],['তারিখ','ধরন','হিসাব','ব্যক্তি/প্রতিষ্ঠান','মোবাইল','খাত','টাকা (৳)','মাধ্যম','বিবরণ'],...a.map(e=>[e.date,e.type,e.scope,e.person,e.phone,e.category,e.amount,e.method,e.description]),...ds.map(d=>[d.date,d.direction,d.scope,d.person,d.phone,'Debt',d.amount,'',d.description]),...ds.flatMap(d=>(d.payments||[]).map(p=>[p.date,'repayment-'+d.direction,d.scope,d.person,d.phone,'Debt repayment',p.amount,'',d.description]))],'eye-touch-report-'+m+'.csv')};
+$('csv').onclick=()=>csv([['তারিখ','ধরন','হিসাব','ব্যক্তি/প্রতিষ্ঠান','মোবাইল','খাত','টাকা (৳)','মাধ্যম','বিবরণ'],...D.entries.map(e=>[e.date,e.type,e.scope,e.person,e.phone,e.category,e.amount,e.method,e.description]),...D.debts.flatMap(d=>[[d.date,d.direction,d.scope,d.person,d.phone,'Debt principal',d.amount,'',d.description],...(d.payments||[]).map(p=>[p.date,'repayment-'+d.direction,d.scope,d.person,d.phone,'Debt repayment',p.amount,'',d.description])]),...D.installments.flatMap(x=>[[x.startDate,'installment-plan','personal',x.name,'','Installment total',x.total,'',x.note],...(x.payments||[]).map(p=>[p.date,'installment-payment','personal',x.name,'','Installment payment',p.amount,p.method,p.note])])],'eye-touch-link-export.csv');
 $('backup').onclick=$('b2').onclick=backup;$('restore').onclick=()=>$('file').click();
 $('file').onchange=async e=>{try{if(!e.target.files[0])return;let x=JSON.parse(await e.target.files[0].text()),d=normalise(x.data||x);if(!Array.isArray(d.entries)||!Array.isArray(d.debts))throw Error();if(confirm('বর্তমান হিসাব প্রতিস্থাপন হবে। আগে বর্তমান ব্যাকআপ ডাউনলোড করবেন?')){backup();D=d;save();alert('ব্যাকআপ পুনরুদ্ধার হয়েছে')}}catch(_){alert('সঠিক JSON ব্যাকআপ ফাইল নির্বাচন করুন')}e.target.value=''};
-$('clear').onclick=()=>{if(confirm('সব হিসাব স্থায়ীভাবে মুছে যাবে। আগে ব্যাকআপ নিন। নিশ্চিত?')){backup();D={entries:[],debts:[]};save()}};
+$('clear').onclick=()=>{if(confirm('সব হিসাব স্থায়ীভাবে মুছে যাবে। আগে ব্যাকআপ নিন। নিশ্চিত?')){backup();D={entries:[],debts:[],installments:[]};save()}};
 
 // Cloud setup: preserve local data; use the existing schema id + ledger_data.
 function cloudConfig(){try{return JSON.parse(localStorage.getItem(CLOUD)||'{}')}catch{return {}}}
@@ -170,27 +227,30 @@ $('sendOtp').onclick=async()=>{if(!sb)return alert('আগে Supabase URL ও k
 $('verifyOtp').onclick=async()=>{if(!sb)return alert('আগে Supabase URL ও key সংরক্ষণ করুন');const email=$('authEmail').value.trim(),token=$('otpCode').value.trim();if(!email||!token)return alert('ইমেইল এবং OTP কোড লিখুন');const {data,error}=await sb.auth.verifyOtp({email,token,type:'email'});if(error){$('cloudMsg').textContent='কোড যাচাই হয়নি: '+error.message;return alert('কোড যাচাই হয়নি: '+error.message)}user=data.user;updateCloudStatus();await syncCloud(true)};
 $('logout').onclick=async()=>{if(sb)await sb.auth.signOut();user=null;updateCloudStatus()};
 async function syncCloud(initial){
-  if(!sb||!user||syncBusy)return;
+  if(!sb||!user)return;
+  if(syncBusy){syncPending=true;return;}
   syncBusy=true;$('cloudMsg').textContent='সিঙ্ক হচ্ছে…';
   try{
     if(!initial){await uploadCloud();$('cloudMsg').textContent='ক্লাউডে সেভ হয়েছে • '+new Date().toLocaleString('bn-BD');updateCloudStatus();return}
     let {data,error}=await sb.from('ledger_data').select('data,updated_at').eq('user_id',user.id).maybeSingle();
     if(error)throw error;
     if(data&&data.data){
-      let localHas=D.entries.length||D.debts.length;
-      let cloudHas=(data.data.entries||[]).length||(data.data.debts||[]).length;
+      let localHas=(D.entries||[]).length||(D.debts||[]).length||(D.installments||[]).length;
+      let cloudHas=(data.data.entries||[]).length||(data.data.debts||[]).length||(data.data.installments||[]).length;
       if(!localHas&&cloudHas){D=normalise(data.data);saveLocal();}
       else if(localHas&&!cloudHas){await uploadCloud();}
       else if(localHas&&cloudHas){
-        let useCloud=confirm('ক্লাউডে এবং এই ডিভাইসে—দুই জায়গাতেই হিসাব আছে। OK = আগে ব্যাকআপ নিয়ে ক্লাউডের হিসাব আনুন; Cancel = এই ডিভাইসের হিসাব ক্লাউডে আপলোড করুন।');
-        if(useCloud){backup();D=normalise(data.data);saveLocal();}
+        let useCloud=confirm('দুই জায়গাতেই হিসাব আছে। নিরাপত্তার জন্য আগে বর্তমান ডিভাইসের ব্যাকআপ ডাউনলোড হবে। OK = তারপর ক্লাউডের হিসাব এই ডিভাইসে আনুন; Cancel = এই ডিভাইসের হিসাব ক্লাউডে আপলোড করুন।');
+        // Always preserve the current device data before either side can be overwritten.
+        backup();
+        if(useCloud){D=normalise(data.data);saveLocal();}
         else await uploadCloud();
       }
       render();
     }else{await uploadCloud();}
     $('cloudMsg').textContent='সিঙ্ক সম্পন্ন • '+new Date().toLocaleString('bn-BD');updateCloudStatus();
   }catch(e){$('cloudMsg').textContent='সিঙ্ক ব্যর্থ: '+(e.message||String(e))+' — public.ledger_data টেবিল ও RLS সেটআপ পরীক্ষা করুন।'}
-  finally{syncBusy=false}
+  finally{syncBusy=false;if(syncPending&&sb&&user){syncPending=false;queueMicrotask(()=>syncCloud(false));}}
 }
 async function uploadCloud(){if(!sb||!user)return;let {error}=await sb.from('ledger_data').upsert({user_id:user.id,data:D,updated_at:new Date().toISOString()},{onConflict:'user_id'});if(error)throw error}
 $('syncNow').onclick=async()=>{if(!sb||!user)return alert('আগে ক্লাউড সেটিংস দিয়ে লগইন করুন');await syncCloud(true)};
