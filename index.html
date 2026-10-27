@@ -22,6 +22,29 @@ button{border:0;border-radius:9px;background:var(--g);color:white;padding:10px 1
 .txn-options{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:12px 0}.txn-option{background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px;text-align:left;color:#17221d;min-height:94px}.txn-option b{display:block;font-size:16px;margin-bottom:5px}.txn-option span{display:block;font-size:12px;color:var(--muted);font-weight:400}.txn-option:hover{border-color:var(--g);box-shadow:0 0 0 2px #176b4d12}.person-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:12px 0}.person-metric{border:1px solid var(--line);border-radius:10px;padding:12px;background:#fff}.person-metric .metric{font-size:12px;color:var(--muted)}.person-metric .amount{font-size:clamp(17px,2.8vw,23px)}.repay-form{border:1px solid var(--line);border-radius:12px;padding:14px;margin:12px 0;background:#fafffb}.schedule-row{display:grid;grid-template-columns:1.1fr 1fr 1.4fr auto;gap:8px;align-items:end;margin:8px 0;padding:10px;border:1px solid var(--line);border-radius:10px;background:#fafffb}.schedule-row label{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:650}.schedule-row input{width:100%;padding:9px;border:1px solid #cbd8cf;border-radius:8px;font:inherit;min-width:0}@media(max-width:600px){.schedule-row{grid-template-columns:1fr 1fr}.schedule-row .sched-note{grid-column:1/-1}}.notice{background:#fff8e8;border:1px solid #f1d9a6;border-radius:10px;padding:10px;font-size:13px;margin:8px 0}.status{font-size:12px;padding:6px 9px;border-radius:20px;background:#edf2ee}
 @media(max-width:720px){.txn-options{grid-template-columns:1fr}.person-metrics{grid-template-columns:1fr 1fr}.cards{grid-template-columns:1fr 1fr}.form{grid-template-columns:1fr 1fr}.filters{grid-template-columns:1fr 1fr}.reportgrid{grid-template-columns:1fr}}
 @media(max-width:440px){.form{grid-template-columns:1fr}.app{padding:9px}}
+/* Mobile-friendly installment cards: keep every action visible without horizontal scrolling. */
+@media(max-width:600px){
+ #instTable .tablewrap{overflow:visible;border:0;background:transparent}
+ #instTable table{min-width:0;width:100%;border-collapse:separate;border-spacing:0}
+ #instTable thead{display:none}
+ #instTable tbody{display:grid;gap:12px}
+ #instTable tr{display:block;background:#fff;border:1px solid var(--line);border-radius:12px;padding:8px 12px;box-shadow:0 1px 2px #00000008}
+ #instTable td{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:8px 0;font-size:13px;border-bottom:1px solid var(--line);min-width:0;overflow-wrap:anywhere}
+ #instTable td:before{font-weight:700;color:var(--muted);flex:0 0 42%;content:""}
+ #instTable td:nth-child(1):before{content:"কিস্তি / ঋণদাতা"}
+ #instTable td:nth-child(2):before{content:"শুরু"}
+ #instTable td:nth-child(3):before{content:"মোট টাকা"}
+ #instTable td:nth-child(4):before{content:"জমা"}
+ #instTable td:nth-child(5):before{content:"বাকি"}
+ #instTable td:nth-child(6):before{content:"কিস্তি সংখ্যা"}
+ #instTable td:nth-child(7):before{content:"পরবর্তী তারিখ"}
+ #instTable td:nth-child(8):before{content:"অবস্থা"}
+ #instTable td:nth-child(9){display:grid;grid-template-columns:1fr 1fr;gap:8px;border-bottom:0;padding-top:12px}
+ #instTable td:nth-child(9):before{content:"অ্যাকশন";grid-column:1/-1}
+ #instTable td:nth-child(9) button{width:100%;min-height:42px;white-space:normal;font-size:13px;padding:8px 6px}
+ #instTable tr:last-child td{border-bottom:1px solid var(--line)}
+ #instTable tr:last-child td:nth-child(9){border-bottom:0}
+}
 @media print{body{background:white}.top,.tabs,.no-print,.footer,button{display:none!important}.app{padding:0}.panel{display:none!important}#reports.panel{display:block!important}.box,.card{box-shadow:none;break-inside:avoid}.cards{grid-template-columns:repeat(4,1fr)}table{min-width:0}td,th{font-size:10px;padding:5px}}
 </style>
 </head>
