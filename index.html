@@ -294,15 +294,15 @@ async function syncCloud(initial){
   syncBusy=true;$('cloudMsg').textContent='সিঙ্ক হচ্ছে…';
   try{
     if(!initial){await uploadCloud();$('cloudMsg').textContent='ক্লাউডে সেভ হয়েছে • '+new Date().toLocaleString('bn-BD');updateCloudStatus();return}
-    // Prefer the schema documented for this project: ledger_data(id, ledger_data, updated_at).
-    // Fall back to the older ledger_data(user_id, data, updated_at) schema if necessary.
+    // Use the actual project table: user_ledgers(user_id, ledger_data, updated_at).
+    // Fall back to the legacy data column in the same user_ledgers table if necessary.
     let row=null;
-    let result=await sb.from('ledger_data').select('id,ledger_data,updated_at').eq('id',user.id).maybeSingle();
+    let result=await sb.from('user_ledgers').select('user_id,ledger_data,updated_at').eq('user_id',user.id).maybeSingle();
     if(!result.error){cloudSchema='id-ledger_data';row=result.data;}
     else {
       const currentSchemaError=result.error.message||String(result.error);
-      result=await sb.from('ledger_data').select('user_id,data,updated_at').eq('user_id',user.id).maybeSingle();
-      if(result.error)throw new Error('ক্লাউড টেবিলের schema বা RLS policy মিলছে না। ledger_data টেবিলে id + ledger_data অথবা user_id + data কলাম এবং উপযুক্ত RLS policy পরীক্ষা করুন। বর্তমান schema ত্রুটি: '+currentSchemaError+'; পুরোনো schema ত্রুটি: '+(result.error.message||String(result.error)));
+      result=await sb.from('user_ledgers').select('user_id,data,updated_at').eq('user_id',user.id).maybeSingle();
+      if(result.error)throw new Error('ক্লাউড টেবিলের schema বা RLS policy মিলছে না। user_ledgers টেবিলে user_id + ledger_data অথবা user_id + data কলাম এবং উপযুক্ত RLS policy পরীক্ষা করুন। বর্তমান schema ত্রুটি: '+currentSchemaError+'; পুরোনো schema ত্রুটি: '+(result.error.message||String(result.error)));
       cloudSchema='user_id-data';row=result.data;
     }
     const cloudPayload=row?(cloudSchema==='id-ledger_data'?row.ledger_data:row.data):null;
@@ -321,22 +321,22 @@ async function syncCloud(initial){
       render();
     }else{await uploadCloud();}
     $('cloudMsg').textContent='সিঙ্ক সম্পন্ন • '+new Date().toLocaleString('bn-BD');updateCloudStatus();
-  }catch(e){$('cloudMsg').textContent='সিঙ্ক ব্যর্থ: '+(e.message||String(e))+' — public.ledger_data টেবিল ও RLS সেটআপ পরীক্ষা করুন।'}
+  }catch(e){$('cloudMsg').textContent='সিঙ্ক ব্যর্থ: '+(e.message||String(e))+' — public.user_ledgers টেবিল ও RLS সেটআপ পরীক্ষা করুন।'}
   finally{syncBusy=false;if(syncPending&&sb&&user){syncPending=false;queueMicrotask(()=>syncCloud(false));}}
 }
 async function uploadCloud(){
   if(!sb||!user)return;
   const stamp=new Date().toISOString();
   if(cloudSchema==='user_id-data'){
-    const r=await sb.from('ledger_data').upsert({user_id:user.id,data:D,updated_at:stamp},{onConflict:'user_id'});
+    const r=await sb.from('user_ledgers').upsert({user_id:user.id,data:D,updated_at:stamp},{onConflict:'user_id'});
     if(!r.error)return;
     // If the saved legacy schema no longer exists, try the current project schema.
   }
-  const current=await sb.from('ledger_data').upsert({id:user.id,ledger_data:D,updated_at:stamp},{onConflict:'id'});
+  const current=await sb.from('user_ledgers').upsert({user_id:user.id,ledger_data:D,updated_at:stamp},{onConflict:'user_id'});
   if(!current.error){cloudSchema='id-ledger_data';return;}
-  const legacy=await sb.from('ledger_data').upsert({user_id:user.id,data:D,updated_at:stamp},{onConflict:'user_id'});
+  const legacy=await sb.from('user_ledgers').upsert({user_id:user.id,data:D,updated_at:stamp},{onConflict:'user_id'});
   if(!legacy.error){cloudSchema='user_id-data';return;}
-  throw new Error('ক্লাউডে সেভ হয়নি। ledger_data টেবিলে id + ledger_data অথবা user_id + data schema এবং উপযুক্ত RLS policy লাগবে। বর্তমান schema: '+current.error.message+'; পুরোনো schema: '+legacy.error.message);
+  throw new Error('ক্লাউডে সেভ হয়নি। user_ledgers টেবিলে user_id + ledger_data অথবা user_id + data schema এবং উপযুক্ত RLS policy লাগবে। বর্তমান schema: '+current.error.message+'; পুরোনো schema: '+legacy.error.message);
 }
 $('syncNow').onclick=async()=>{if(!sb||!user)return alert('আগে ক্লাউড সেটিংস দিয়ে লগইন করুন');await syncCloud(true)};
 const originalSave=save; // local save remains primary; syncCloud errors are shown in Settings.
