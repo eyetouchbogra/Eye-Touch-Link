@@ -1,5 +1,5 @@
 
-const CACHE = 'eye-touch-link-v2';
+const CACHE = 'eye-touch-link-v3';
 
 const FILES = [
   './',
