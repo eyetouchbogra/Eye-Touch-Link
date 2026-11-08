@@ -1,0 +1,19 @@
+Eye Touch Link — GitHub Pages-এ প্রকাশের নিয়ম
+
+আপনার আগের GitHub Pages ঠিকানা:
+https://eyetouchbogra.github.io/Eye-Touch-Link/
+
+১) Eye-Touch-Link-Final-Offline-PWA.zip Extract করুন।
+২) ZIP-এর ভেতরের PWA ফোল্ডারের সব ফাইল (index.html, sw.js, manifest.webmanifest, icon-192.png, icon-512.png) একসাথে রাখুন।
+৩) GitHub-এ eyetouchbogra/Eye-Touch-Link repository খুলুন।
+৪) Add file > Upload files নির্বাচন করুন। PWA ফোল্ডারের ভেতরের ফাইলগুলো repository-র মূল (root) জায়গায় upload করুন; PWA নামে সাবফোল্ডার হিসেবে নয়।
+৫) Commit changes দিন।
+৬) Repository > Settings > Pages-এ গিয়ে Build and deployment-এ Deploy from a branch, Branch: main, Folder: /(root) নির্বাচন করে Save দিন (আগে থেকেই চালু থাকলে সেটি অপরিবর্তিত রাখুন)।
+৭) প্রকাশ শেষ হলে উপরের ঠিকানাটি Chrome-এ খুলুন। প্রথমবার অনলাইনে খুলে লোড হতে দিন।
+৮) Android Chrome: ⋮ > Install app / Add to Home screen। Windows Chrome/Edge: address bar-এর Install আইকন অথবা Menu > Install page as app।
+
+সতর্কতা:
+- এটি PWA প্রকাশের ফাইল। HTTPS-এ প্রকাশের আগে Service Worker কাজ করবে না, তাই ZIP খুলে সরাসরি অফলাইন ইনস্টল হবে না।
+- প্রতিটি ডিভাইস নিজের Local Storage-এ আলাদা হিসাব রাখবে। একই URL হলেও ডেটা এক ডিভাইস থেকে অন্য ডিভাইসে যাবে না।
+- পুরোনো সাইটের ফাইল প্রতিস্থাপনের আগে পুরোনো হিসাব থাকলে JSON Backup নিন।
+- GitHub Pages publish না হওয়া পর্যন্ত স্থায়ী live URL আপডেট হয়েছে বলা যাবে না।
