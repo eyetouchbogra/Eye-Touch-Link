@@ -1,10 +1,14 @@
-const CACHE = 'eye-touch-link-logo-v2';
+const CACHE = 'eye-touch-link-cloud-v9';
 const CORE = [
   './',
   './index.html',
+  './supabase-config.js',
+  './cloud-sync.js',
+  './pin-lock.js',
   './manifest.webmanifest',
   './icons/icon-192.png',
-  './icons/icon-512.png'
+  './icons/icon-512.png',
+  './icons/eye-touch-link-logo.svg'
 ];
 
 self.addEventListener('install', event => {

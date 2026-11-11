@@ -1,0 +1,41 @@
+EYE TOUCH LINK — ANDROID PWA + CLOUD PACKAGE
+===========================================
+
+এটি Android-এর জন্য PWA package, APK নয়। GitHub Pages/HTTPS থেকে খুলে Install করতে হবে।
+
+প্রকাশিত হওয়ার পরে ইনস্টল:
+1. Android Chrome-এ আপনার GitHub Pages URL খুলুন।
+2. Chrome-এর তিন ডট (⋮) > Install app নির্বাচন করুন।
+3. Install চাপুন। আইকন Home Screen-এ থাকবে।
+
+Cloud Sync চালুর আগে:
+1. পুরোনো অ্যাপের প্রতিটি ডিভাইস থেকে Settings > JSON Backup নিন।
+2. Supabase SQL Editor-এ supabase-device-schema.sql একবার Run করুন।
+3. Supabase Authentication > URL Configuration-এ প্রকৃত GitHub Pages URL Site URL ও Redirect URL হিসেবে দিন।
+4. Email provider চালু রাখুন। Phone OTP-এর জন্য Phone provider ও SMS provider configure করতে হবে; OTP পাঠানোর প্রতিবার SMS provider-এর চার্জ লাগতে পারে। হিসাব এন্ট্রি, সম্পাদনা, ডিলিট বা Cloud Sync-এর জন্য SMS পাঠানো হয় না। Gmail Login Link-এ SMS চার্জ নেই।
+5. etl_mobile ফোল্ডারের সব ফাইল ও icons ফোল্ডার GitHub Pages-এর প্রকাশিত root-এ আপলোড করুন।
+6. প্রথম ডিভাইসে Gmail Magic Link বা Phone OTP দিয়ে লগইন করুন। প্রথম ডিভাইস Approved হবে।
+7. অন্য ডিভাইসে একই account-এর linked পরিচয় দিয়ে লগইন করুন। প্রথম ডিভাইস থেকে Settings > Cloud Sync ও ডিভাইস অংশে Approve করুন।
+
+Gmail ও ফোন একই account-এ ব্যবহার করতে:
+প্রথমে একটি পরিচয় দিয়ে লগইন করুন। তারপর Settings-এর “একই অ্যাকাউন্টে বিকল্প লগইন যুক্ত করুন” অংশে অন্য পরিচয়টি Link ও Verify করুন। আলাদা account খুললে হিসাব আলাদা হবে।
+
+ডেটা সুরক্ষা:
+- স্থানীয় হিসাব localStorage-এ থাকে এবং Offline-এ ব্যবহার করা যায়।
+- Cloud পরিবর্তন প্রায় ১৫ সেকেন্ড অন্তর পরীক্ষা হয়।
+- একই সময়ে দুই ডিভাইসে আলাদা পরিবর্তন হলে Sync Conflict দেখাবে; নীরবে overwrite করবে না।
+- দুই ডিভাইসের লোকাল ও Cloud হিসাব আলাদা হলে অ্যাপ সিদ্ধান্ত নেওয়ার আগে Backup তৈরি/ডাউনলোডের চেষ্টা করবে। Settings থেকে Cloud আনতে বা Local হিসাব Cloud-এ পাঠাতে পারবেন।
+- Publishable key browser-এ ব্যবহারযোগ্য। service_role/secret key কখনো HTML/JS-এ দেবেন না।
+- Device approval hardware/IMEI lock নয়; browser data মুছে গেলে নতুন device ID হতে পারে।
+- PIN Lock এই সংস্করণে এখনো নেই; এটি আলাদা উন্নয়ন।
+
+মূল ফাইল:
+index.html                  মূল responsive হিসাব অ্যাপ + Cloud UI
+cloud-sync.js               Login, device approval, cloud sync
+supabase-config.js          Project URL ও Publishable Key
+supabase-device-schema.sql  নতুন Cloud table ও RPC function
+manifest.webmanifest        PWA install settings
+sw.js                       Offline cache
+icons/                      App icon ও logo
+Eye-Touch-Link-Final.html   আগের standalone HTML কপি
+README-CLOUD-BN.txt         সম্পূর্ণ সেটআপ নির্দেশনা

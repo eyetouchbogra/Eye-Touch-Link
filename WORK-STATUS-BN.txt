@@ -1,0 +1,30 @@
+Eye Touch Link — v2.3 PIN/Auth sequencing fix
+
+এই প্যাকেজে আগের v2.2-এর সব অ্যাপ ফাইল, সবুজ ডিজাইন, হিসাবের ডেটা স্ট্রাকচার, Supabase configuration, offline cache এবং icons রাখা হয়েছে।
+
+v2.3 সংশোধন:
+1. PIN স্ক্রিপ্ট এখন Cloud/Supabase-এর প্রথম Login session check শেষ হওয়ার আগে PIN setup/unlock দেখাবে না।
+2. Login screen দৃশ্যমান থাকলে PIN overlay বন্ধ থাকবে। Login সফল হয়ে Login screen বন্ধ হওয়ার পর PIN setup/unlock দেখাবে।
+3. Settings পেজে আগের PIN security panel রাখা হয়েছে।
+4. Service worker cache version v6 করা হয়েছে এবং JS asset URL version bump করা হয়েছে, যাতে পুরোনো cached PIN script ব্যবহারের ঝুঁকি কমে।
+
+যাচাই:
+- pin-lock.js, cloud-sync.js, sw.js — node --check সফল।
+- ZIP-এর মধ্যে index.html root-এ আছে; Cloudflare Static Assets upload-এর জন্য প্রস্তুত।
+- OAuth, Supabase, SMS OTP, Cloud Sync live browser end-to-end পরীক্ষা এই প্যাকেজ তৈরির পরিবেশে করা হয়নি। Worker-এ deploy করে ব্যবহারকারীকে পরীক্ষা করতে হবে।
+
+গুরুত্বপূর্ণ:
+- Deploy করার আগে বর্তমান লোকাল হিসাবের JSON backup রাখুন।
+- Cloudflare-এ ZIP ফাইলটি সরাসরি নয়; ZIP extract করে ভিতরের সব ফাইল/ফোল্ডার (index.html, JS, manifest, icons ইত্যাদি) একসঙ্গে upload করুন।
+- supabase-config.js-এ কেবল public publishable key থাকবে; service_role বা secret key কখনো client package-এ দেবেন না।
+
+
+লগইন নিরাপত্তা প্রস্তুতি v2.5 (কোড পরিবর্তন):
+1. ফোন OTP Login-এ shouldCreateUser:false; ফোন আগে একই Google/Gmail অ্যাকাউন্টে যাচাই করে যুক্ত না থাকলে নতুন আলাদা Supabase user তৈরি হবে না।
+2. Gmail-এ আলাদা updateUser করে account email বদলে ফেলার বিভ্রান্তিকর কন্ট্রোল সরিয়ে, বর্তমান Google/Gmail ও ফোনের অবস্থা দেখানো হয়েছে।
+3. ফোন যুক্ত করার OTP অবশ্যই বর্তমান সাইন-ইন করা একই user ID-তে যাচাই হতে হবে।
+4. Service Worker cache v8 এবং cloud-sync.js URL version 25 করা হয়েছে।
+5. SMS OTP পাঠানো, Google OAuth এবং একই user ID-তে ফোন Login — এগুলো লাইভ Supabase/SMSGAT সেটিংসের ওপর নির্ভরশীল; deploy করে বাস্তব পরীক্ষা বাকি।
+
+
+v2.6 Login feedback fix: Gmail OTP now disables account creation, shows request/error state, and catches exceptions. Google OAuth button shows explicit progress/errors. Cache bumped to v9. Live SMTP and Google OAuth Dashboard configuration still must be verified separately.

@@ -1,0 +1,34 @@
+EYE TOUCH LINK — LOGIN FIX v2.6
+
+এই প্যাকেজে মূল সবুজ ডিজাইন, হিসাবের ডেটা, Supabase device/cloud schema, logo, icons এবং PIN lock অপরিবর্তিত রাখা হয়েছে।
+
+কোডে সংশোধন:
+1) Gmail Login Link বাটনে এখন পাঠানোর সময়, সফল অনুরোধ এবং প্রকৃত error—সবই স্ক্রিনে দেখাবে।
+2) Gmail OTP-তে shouldCreateUser:false ব্যবহার করা হয়েছে, যাতে একই Gmail দিয়ে ভুল করে দ্বিতীয় Supabase user তৈরি না হয়।
+3) Google Login বাটন ও Email Link বাটনে loading/disabled অবস্থা এবং error logging যোগ হয়েছে।
+4) Service Worker cache v9 এবং script version bump করা হয়েছে, যাতে পুরোনো login code আটকে না থাকে।
+
+গুরুত্বপূর্ণ: এই কোড Supabase/Google Dashboard-এর বাহ্যিক সেটিংস নিজে থেকে পরিবর্তন করতে পারে না। Live Login চালাতে নিচের সেটিংস মিলতে হবে।
+
+SUPABASE সেটিংস
+A) Authentication > URL Configuration:
+   Site URL: https://eyetouchbogra.github.io
+   Redirect URLs-এ যোগ করুন: https://eyetouchbogra.github.io/Eye-Touch-Link/
+B) Authentication > Providers > Email: Enabled রাখুন।
+C) Email Login Link যদি না আসে, Authentication > SMTP Settings-এ নিজের SMTP provider configure ও verify করুন। Supabase-এর default email sender সীমিত/রেট-লিমিটেড হতে পারে।
+D) Google Provider Enabled করে Google Cloud OAuth-এর Client ID ও Client Secret Supabase Dashboard-এ দিন।
+
+GOOGLE CLOUD OAuth Web Client
+Authorized JavaScript origins:
+   https://eyetouchbogra.github.io
+Authorized redirect URI (এটি Supabase callback, GitHub Pages URL নয়):
+   https://cmojbhfdtbxvpbjhobbx.supabase.co/auth/v1/callback
+Google OAuth consent screen যদি Testing mode-এ থাকে, eyetouchbogra@gmail.com-কে Test user হিসেবে যোগ করুন।
+
+DEPLOY
+1) ZIP extract করুন।
+2) Extract করা ফোল্ডারের সব ফাইল ও icons ফোল্ডার একসঙ্গে GitHub repo Eye-Touch-Link-এর root-এ upload/replace করুন।
+3) GitHub Pages deploy শেষ হলে PC ও ফোনে সাইটটি নতুন করে খুলুন। PWA পুরোনো cache রাখলে site reload/refresh করুন।
+4) প্রথমে PC-তে বর্তমান login অক্ষত রেখে পরীক্ষা করুন। তারপর ফোনে Google Login বা Gmail Login Link পরীক্ষা করুন।
+
+নিরাপত্তা: supabase-config.js-এ শুধু public publishable key থাকবে। service_role key, Google Client Secret, OTP বা password কখনো HTML/JS ফাইলে যোগ করবেন না।

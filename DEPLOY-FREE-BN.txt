@@ -1,0 +1,11 @@
+EYE TOUCH LINK — FREE DEPLOYMENT NOTES
+
+১) Cloudflare Pages Free-এ static site হিসেবে etl_mobile ফোল্ডারের contents deploy করুন। Root directory হবে etl_mobile; build command লাগবে না; output directory root (.)।
+২) deploy-এর পর পাওয়া https://YOUR-SITE.pages.dev URL Supabase Dashboard > Authentication > URL Configuration-এ Site URL এবং Redirect URLs-এ যোগ করুন।
+৩) Google Cloud OAuth Web client-এ Authorized JavaScript origins হিসেবে https://YOUR-SITE.pages.dev যোগ করুন। Authorized redirect URI হবে:
+   https://cmojbhfdtbxvpbjhobbx.supabase.co/auth/v1/callback
+৪) Google OAuth app Testing-এ থাকলে Google Auth Platform > Audience > Test users-এ যে Gmail দিয়ে পরীক্ষা করবেন সেটি যোগ করুন।
+৫) Supabase Authentication > Providers > Google-এ Client ID ও Client Secret Dashboard-এ সেট করা থাকতে হবে। Secret কখনো এই ফোল্ডারে যোগ করবেন না।
+৬) সাইট HTTPS-এ খুলে Google দিয়ে প্রবেশ পরীক্ষা করুন। Google login সফল হলেও database/device RPC error দেখালে সেটি আলাদা live configuration issue; স্ক্রিনশটে secret/NID/OTP ঢেকে পাঠাবেন।
+
+গুরুত্বপূর্ণ: Supabase SQL schema আপনার আগের কাজেই সফলভাবে apply হয়েছে বলে একই SQL আবার চালাবেন না। Phone OTP-এর জন্য SMSGAT KYC approval এবং secure server-side SMS integration এখনো আলাদা কাজ।
