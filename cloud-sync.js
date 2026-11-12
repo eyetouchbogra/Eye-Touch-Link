@@ -228,14 +228,19 @@
     btn.disabled=true;btn.textContent='Google-এ সংযোগ হচ্ছে…';
     authMessage('Google Login চালু হচ্ছে…');
     try{
-      const {error}=await client.auth.signInWithOAuth({
+      const {data,error}=await client.auth.signInWithOAuth({
         provider:'google',
         options:{
           redirectTo:location.origin+location.pathname,
-          queryParams:{prompt:'select_account'}
+          queryParams:{prompt:'select_account'},
+          skipBrowserRedirect:true
         }
       });
       if(error)throw error;
+      if(!data?.url)throw new Error('Google Login URL পাওয়া যায়নি।');
+      // Navigate explicitly so mobile browsers do not remain on the
+      // "Google Login চালু হচ্ছে" status without opening the provider.
+      window.location.assign(data.url);
     }catch(e){
       authMessage('Google Login ব্যর্থ: '+(e.message||e));
       btn.disabled=false;btn.textContent=old;

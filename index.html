@@ -130,4 +130,4 @@ $('csv').onclick=()=>{const rows=[['তারিখ','নাম','হিসা�
 installReadableDateFields();syncReadableDateFields();render();syncReadableDateFields();$('langToggle').textContent=lang==='bn'?'English':'বাংলা';window.etlGetDb=()=>db;window.etlSetDb=(v)=>{if(!v||!Array.isArray(v.tx)||!Array.isArray(v.debts))throw new Error('Invalid account data');db={...db,...v,ledger:Array.isArray(v.ledger)?v.ledger:[],people:Array.isArray(v.people)?v.people:[]};localStorage.setItem(key,JSON.stringify(db));render();syncReadableDateFields()};
 })();
 if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));}
-</script><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="./supabase-config.js"></script><script src="./cloud-sync.js?v=30"></script><script src="./pin-lock.js?v=25"></script></body></html>
+</script><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="./supabase-config.js"></script><script src="./cloud-sync.js?v=31"></script><script src="./pin-lock.js?v=25"></script></body></html>
