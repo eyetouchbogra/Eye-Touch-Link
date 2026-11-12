@@ -19,6 +19,16 @@
   const status=(msg)=>{const n=$('cloudStatusText');if(n)n.textContent=msg;const h=$('localSaveLabel');if(h)h.textContent=msg.includes('Sync')||msg.includes('সিঙ্ক')?'☁ Cloud Sync':msg.includes('Offline')||msg.includes('অফলাইন')?'● Offline':'☁ '+msg.slice(0,24)};
   const gate=(show)=>{const g=$('etlAuthGate');if(g)g.style.display=show?'flex':'none';const layout=document.querySelector('.layout'),top=document.querySelector('.top');if(layout)layout.style.visibility=show?'hidden':'visible';if(top)top.style.visibility=show?'hidden':'visible'};
   const authMessage=(m)=>{if($('etlAuthMessage'))$('etlAuthMessage').textContent=m};
+  function updateIdentityStatus(user){
+    const el=$('cloudIdentityStatus');
+    if(!el)return;
+    if(!user){el.textContent='এই ডিভাইসে Cloud Login করা হয়নি।';return;}
+    const providers=new Set([...(user.identities||[]).map(x=>x.provider),user.app_metadata?.provider].filter(Boolean));
+    const email=user.email?('Gmail: '+user.email):'Gmail পাওয়া যায়নি';
+    const phone=user.phone?('ফোন যাচাই করা আছে: '+user.phone):'ফোন এখনো যুক্ত/যাচাই করা হয়নি';
+    const google=providers.has('google')?'Google Login সংযুক্ত':'এই Login-এ Google পরিচয় পাওয়া যায়নি';
+    el.textContent=email+' · '+phone+' · '+google;
+  }
   const showArea=(which)=>{['etlLoginFields','etlPendingArea','etlDeniedArea'].forEach(id=>{if($(id))$(id).style.display=id===which?'block':'none'})};
   const rpc=async(name,args)=>{const {data,error}=await client.rpc(name,args);if(error)throw error;return data};
   const localData=()=>window.etlGetDb?.()||null;
@@ -96,11 +106,9 @@
               p_target_device_id: b.dataset.approveDevice
             });
             await refreshDevices();
-            alert(
-              ok
-                ? 'ডিভাইস অনুমোদিত হয়েছে। নতুন ডিভাইসে “আবার যাচাই করুন” চাপুন।'
-                : 'ডিভাইস অনুমোদন করা যায়নি; তালিকা রিফ্রেশ করুন।'
-            );
+            alert(ok
+              ? 'ডিভাইস অনুমোদিত হয়েছে। নতুন ডিভাইসে “আবার যাচাই করুন” চাপুন।'
+              : 'ডিভাইস অনুমোদন করা যায়নি; তালিকা রিফ্রেশ করুন।');
           } catch (e) {
             alert(e.message);
           }
@@ -121,6 +129,7 @@
           }
         };
       });
+
     } catch (e) {
       el.textContent = 'ডিভাইস তালিকা পাওয়া যায়নি: ' + e.message;
       status('ডিভাইস তালিকা রিফ্রেশ ব্যর্থ: ' + e.message);
@@ -192,23 +201,9 @@
     if(loginInProgress)return;
     loginInProgress=true;
     try{
-    const {data:{user},error:userError}=await client.auth.getUser();
-    if(userError)throw userError;
-    const identityEl=$('cloudIdentityStatus');
-    if(!user){
-      currentUserId=null;
-      if(identityEl)identityEl.textContent='এখনো কোনো Cloud অ্যাকাউন্টে প্রবেশ করা হয়নি।';
-      gate(true);
-      return;
-    }
-    if(identityEl){
-      const linkedEmail=user.email||user.identities?.find(x=>x.provider==='google')?.identity_data?.email;
-      identityEl.textContent=linkedEmail
-        ? 'এই Cloud অ্যাকাউন্টের Gmail: '+linkedEmail
-        : user.phone
-          ? 'এই Cloud অ্যাকাউন্টের ফোন: '+user.phone
-          : 'অ্যাকাউন্ট যাচাই হয়েছে; Gmail ঠিকানা পাওয়া যায়নি।';
-    }
+    const {data:{user}}=await client.auth.getUser();
+    updateIdentityStatus(user);
+    if(!user){currentUserId=null;gate(true);return}
     if(loginResolvedUserId===user.id)return;
     currentUserId=user.id;
     let state;
@@ -246,6 +241,45 @@
       btn.disabled=false;btn.textContent=old;
     }
   }
+  async function signInWithPassword(){
+    const email=$('etlLoginIdentity').value.trim();
+    const password=$('etlLoginPassword').value;
+    if(!/^\S+@\S+\.\S+$/.test(email))return authMessage('PC-তে ব্যবহৃত একই Gmail লিখুন।');
+    if(!password)return authMessage('Eye Touch Link Password লিখুন।');
+    const btn=$('etlPasswordLogin');
+    const old=btn?.textContent;
+    if(btn){btn.disabled=true;btn.textContent='প্রবেশ যাচাই হচ্ছে…';}
+    try{
+      const {error}=await client.auth.signInWithPassword({email,password});
+      if(error)throw error;
+      authMessage('Password সঠিক। এই ডিভাইসের অনুমোদন যাচাই হচ্ছে…');
+      await finishLogin();
+    }catch(e){
+      authMessage('Gmail + Password দিয়ে প্রবেশ হয়নি: '+(e.message||e));
+    }finally{
+      if(btn){btn.disabled=false;btn.textContent=old||'Gmail + Password দিয়ে প্রবেশ';}
+    }
+  }
+  async function setAccountPassword(){
+    if(!client)return alert('Cloud সংযোগ প্রস্তুত হয়নি।');
+    const p1=$('cloudNewPassword')?.value||'';
+    const p2=$('cloudConfirmPassword')?.value||'';
+    if(p1.length<8)return alert('কমপক্ষে ৮ অক্ষরের Password দিন।');
+    if(p1!==p2)return alert('দুটি Password এক নয়।');
+    try{
+      const {data:{user},error:userError}=await client.auth.getUser();
+      if(userError)throw userError;
+      if(!user||!user.email)return alert('এই PC-তে সক্রিয় Cloud Login পাওয়া যায়নি। আগে PC-তে Google দিয়ে প্রবেশ করুন।');
+      const providers=new Set([...(user.identities||[]).map(x=>x.provider),user.app_metadata?.provider].filter(Boolean));
+      if(!providers.has('google'))return alert('এই PC-র সক্রিয় Cloud অ্যাকাউন্টে Google পরিচয় পাওয়া যায়নি। সঠিক Google-লগইন করা অ্যাকাউন্টে করুন।');
+      const {error}=await client.auth.updateUser({password:p1});
+      if(error)throw error;
+      $('cloudNewPassword').value='';$('cloudConfirmPassword').value='';
+      alert('এই একই Eye Touch Link Cloud অ্যাকাউন্টে Password যুক্ত হয়েছে। এখন ফোনে Google Login না করে একই Gmail ও এই নতুন Password দিয়ে প্রবেশ করুন। এটি Google/Gmail Password নয়।');
+    }catch(e){
+      alert('Password যুক্ত করা যায়নি: '+(e.message||e));
+    }
+  }
   async function sendEmail(){
     const email=$('etlLoginIdentity').value.trim();
     if(!/^\S+@\S+\.\S+$/.test(email))return authMessage('সঠিক Gmail / ইমেইল লিখুন।');
@@ -274,9 +308,10 @@
   async function pushLocalToCloud(){if(!approved)return;try{const c=await rpc('etl_get_cloud_data',{p_device_id:deviceId});if(c){if(!confirm('Cloud-এ আগে থেকে হিসাব আছে। OK দিলে Cloud হিসাবের Backup ডাউনলোড হবে এবং এরপর এই ডিভাইসের লোকাল হিসাব দিয়ে Cloud প্রতিস্থাপন হবে। Cancel করলে কোনো Backup বা পরিবর্তন হবে না।'))return;backupCloud(c);cloudVersion=await rpc('etl_save_cloud_data',{p_device_id:deviceId,p_payload:localData(),p_expected_updated_at:c.updated_at})}else{if(!confirm('Cloud-এ হিসাব নেই। এই ডিভাইসের লোকাল হিসাব প্রথমবার Cloud-এ সংরক্ষণ করবেন?'))return;cloudVersion=await rpc('etl_save_cloud_data',{p_device_id:deviceId,p_payload:localData(),p_expected_updated_at:null})}lastSyncedSnapshot=snapshot(localData());sessionReady=true;saveFirstSyncDecision('resolved');status('লোকাল হিসাব Cloud-এ সংরক্ষিত হয়েছে')}catch(e){status('Cloud-এ পাঠানো যায়নি: '+e.message);alert('Cloud-এ পাঠানো যায়নি: '+e.message)}}
   async function checkRemote(){if(!client||!approved||!sessionReady||!navigator.onLine||pollBusy)return;pollBusy=true;try{const remote=await rpc('etl_get_cloud_data',{p_device_id:deviceId});if(!remote||remote.updated_at===cloudVersion)return;const local=localData();if(same(local,lastSyncedSnapshot)){applyCloud(remote)}else{status('অন্য ডিভাইসে নতুন হিসাব আছে — Settings থেকে Cloud হিসাব আনুন; আপনার লোকাল পরিবর্তন মুছে ফেলা হয়নি।')}}catch(e){if(navigator.onLine)console.warn('Cloud refresh:',e.message)}finally{pollBusy=false}}
   function queueSave(data){if(!configured||!client||!approved||!sessionReady)return;clearTimeout(saveTimer);saveTimer=setTimeout(async()=>{if(cloudBusy){queueSave(localData());return}cloudBusy=true;try{cloudVersion=await rpc('etl_save_cloud_data',{p_device_id:deviceId,p_payload:data,p_expected_updated_at:cloudVersion});lastSyncedSnapshot=snapshot(data);status('Cloud সিঙ্ক সম্পন্ন')}catch(e){status(e.message.includes('CLOUD_CONFLICT')?'অন্য ডিভাইসে পরিবর্তন হয়েছে — Settings থেকে Cloud হিসাব আনুন':'অফলাইন / Sync অপেক্ষমাণ');console.warn('Eye Touch Link cloud save:',e.message)}finally{cloudBusy=false}},900)}
+  async function linkEmail(){const email=$('cloudLinkEmail').value.trim();if(!/^\S+@\S+\.\S+$/.test(email))return alert('সঠিক Gmail লিখুন।');const {error}=await client.auth.updateUser({email});alert(error?'Gmail যুক্ত করার অনুরোধ ব্যর্থ: '+error.message:'Gmail-এ নিশ্চিতকরণ লিংক পাঠানো হয়েছে। লিংকে চাপ দিয়ে নিশ্চিত করুন।')}
   async function linkPhone(){const phone=$('cloudLinkPhone').value.trim();if(!/^\+[1-9]\d{7,14}$/.test(phone))return alert('আন্তর্জাতিক ফরম্যাটে নম্বর লিখুন, যেমন +8801XXXXXXXXX');const {error}=await client.auth.updateUser({phone});if(error)return alert('ফোন যুক্ত করার অনুরোধ ব্যর্থ: '+error.message);$('cloudLinkOtp').dataset.kind='phone_change';$('cloudLinkOtp').dataset.identity=phone;alert('ফোনে OTP পাঠানো হয়েছে। কোডটি লিখে OTP যাচাই চাপুন।')}
-  async function verifyLinked(){const token=$('cloudLinkOtp').value.trim(),kind=$('cloudLinkOtp').dataset.kind,identity=$('cloudLinkOtp').dataset.identity;if(!token||!kind||!identity)return alert('আগে Gmail বা ফোন যুক্ত করার অনুরোধ পাঠান।');const args=kind==='phone_change'?{phone:identity,token,type:'phone_change'}:{email:identity,token,type:'email_change'};const {error}=await client.auth.verifyOtp(args);alert(error?'যাচাই হয়নি: '+error.message:'বিকল্প পরিচয় যুক্ত হয়েছে। এখন Gmail বা ফোন—দুটির যেকোনোটি দিয়ে একই Cloud অ্যাকাউন্টে প্রবেশ করা যাবে।')}
-  function setLoginButtonsEnabled(enabled){['etlGoogleLogin','etlSendEmail','etlSendPhone','etlVerifyOtp'].forEach(id=>{const b=$(id);if(b)b.disabled=!enabled})}
+  async function verifyLinked(){const token=$('cloudLinkOtp').value.trim(),kind=$('cloudLinkOtp').dataset.kind,identity=$('cloudLinkOtp').dataset.identity;if(!token||!kind||!identity)return alert('আগে Gmail বা ফোন যুক্ত করার অনুরোধ পাঠান।');const args=kind==='phone_change'?{phone:identity,token,type:'phone_change'}:{email:identity,token,type:'email_change'};const {error}=await client.auth.verifyOtp(args);if(error)return alert('যাচাই হয়নি: '+error.message);const {data:{user}}=await client.auth.getUser();updateIdentityStatus(user);alert('বিকল্প পরিচয় যুক্ত হয়েছে। এখন Gmail বা ফোন—দুটির যেকোনোটি দিয়ে একই Cloud অ্যাকাউন্টে প্রবেশ করা যাবে।')}
+  function setLoginButtonsEnabled(enabled){['etlGoogleLogin','etlSendEmail','etlSendPhone','etlVerifyOtp','etlPasswordLogin'].forEach(id=>{const b=$(id);if(b)b.disabled=!enabled})}
   function loadSupabaseFallback(src){return new Promise((resolve,reject)=>{const script=document.createElement('script');script.src=src;script.async=true;script.onload=()=>resolve();script.onerror=()=>reject(new Error('লাইব্রেরি লোড হয়নি: '+src));document.head.appendChild(script);setTimeout(()=>reject(new Error('Supabase লাইব্রেরি লোড হতে সময় শেষ হয়েছে')),12000)})}
   async function init(){
     // নিরাপত্তা: Cloud/Auth প্রস্তুত না থাকলে লোকাল ড্যাশবোর্ড কখনো Login ছাড়াই দেখাবেন না।
@@ -292,14 +327,14 @@
     if(!window.supabase?.createClient){setLoginButtonsEnabled(false);authMessage('Supabase লাইব্রেরি পাওয়া যায়নি। পেজ Refresh করুন।');status('Cloud Login লাইব্রেরি পাওয়া যায়নি');return}
     setLoginButtonsEnabled(true);
     client=window.supabase.createClient(cfg.url,cfg.anonKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
-    $('etlGoogleLogin').onclick=signInGoogle;$('etlSendEmail').onclick=sendEmail;$('etlSendPhone').onclick=sendPhone;$('etlVerifyOtp').onclick=verifyOtp;$('etlCheckApproval').onclick=finishLogin;$('etlTryAgain').onclick=finishLogin;
+    $('etlGoogleLogin').onclick=signInGoogle;$('etlPasswordLogin').onclick=signInWithPassword;$('cloudSetPassword').onclick=setAccountPassword;$('etlSendEmail').onclick=sendEmail;$('etlSendPhone').onclick=sendPhone;$('etlVerifyOtp').onclick=verifyOtp;$('etlCheckApproval').onclick=finishLogin;$('etlTryAgain').onclick=finishLogin;
     $('cloudRefreshDevices').onclick=refreshDevices;$('cloudReloadData').onclick=reloadCloud;$('cloudPushData').onclick=pushLocalToCloud;$('cloudSignOut').onclick=async()=>{if(confirm('এই ডিভাইস থেকে লগআউট করবেন?')){await client.auth.signOut();location.reload()}};
     $('cloudSaveDeviceName').onclick=async()=>{const n=$('cloudDeviceName').value.trim();if(!n)return alert('ডিভাইসের নাম লিখুন।');localStorage.setItem(NAME_KEY,n);if(approved){try{await rpc('etl_register_device',{p_device_id:deviceId,p_device_name:n,p_platform:platform()});await refreshDevices();alert('ডিভাইসের নাম সংরক্ষিত হয়েছে।')}catch(e){alert(e.message)}}};
-    // This build has no separate Gmail-link field/button. Bind the phone-link controls that exist.
-    const phoneLinkBtn=$('cloudLinkPhoneBtn');
-    if(phoneLinkBtn)phoneLinkBtn.onclick=linkPhone;
-    const verifyLinkBtn=$('cloudVerifyLinkBtn');
-    if(verifyLinkBtn)verifyLinkBtn.onclick=verifyLinked;
+    // Email-link fields are not present in this app's current Settings HTML.
+    // Guard them so a missing optional control cannot abort Cloud/Auth initialization.
+    if($('cloudLinkEmailBtn'))$('cloudLinkEmailBtn').onclick=linkEmail;
+    if($('cloudLinkPhoneBtn'))$('cloudLinkPhoneBtn').onclick=linkPhone;
+    if($('cloudVerifyLinkBtn'))$('cloudVerifyLinkBtn').onclick=verifyLinked;
     const {data:{session}}=await client.auth.getSession();
     if(session){gate(true);authMessage('আপনার ডিভাইস যাচাই করা হচ্ছে...');await finishLogin()}else{showArea('etlLoginFields');gate(true);status('Login প্রয়োজন')}
     client.auth.onAuthStateChange((event,session)=>{if(event==='SIGNED_IN'&&session){setTimeout(()=>finishLogin().catch(e=>{authMessage('Login সমস্যা: '+e.message)}),0)}if(event==='SIGNED_OUT'){approved=false;sessionReady=false;currentUserId=null;loginResolvedUserId=null;gate(true)}});
