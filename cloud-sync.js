@@ -165,9 +165,14 @@
     if (typeof window.etlSetDb !== 'function') {
       throw new Error('অ্যাপের হিসাব সংরক্ষণের ফাংশন পাওয়া যায়নি।');
     }
+
     window.etlSetDb(d.payload);
     cloudVersion = d.updated_at;
     lastSyncedSnapshot = snapshot(d.payload);
+
+    // FIX 1: Cloud data applied successfully; enable syncing.
+    sessionReady = true;
+
     status('অন্য ডিভাইসের হিসাব Sync হয়েছে');
   }
 
@@ -619,7 +624,9 @@
 
       const local = localData();
 
-      if (same(local, lastSyncedSnapshot)) {
+      // FIX 2: Compare the current snapshot with the saved snapshot string.
+      // Do not JSON.stringify the already serialized snapshot a second time.
+      if (snapshot(local) === lastSyncedSnapshot) {
         applyCloud(remote);
       } else {
         status('অন্য ডিভাইসে নতুন হিসাব আছে — Settings থেকে Cloud হিসাব আনুন; আপনার লোকাল পরিবর্তন মুছে ফেলা হয়নি।');
