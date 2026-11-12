@@ -140,7 +140,7 @@
   }
   async function sendEmail(){
     const email=$('etlLoginIdentity').value.trim();
-    if(!/^\\S+@\\S+\\.\\S+$/.test(email))return authMessage('সঠিক Gmail / ইমেইল লিখুন।');
+    if(!/^\S+@\S+\.\S+$/.test(email))return authMessage('সঠিক Gmail / ইমেইল লিখুন।');
     const btn=$('etlSendEmail');btn.disabled=true;const old=btn.textContent;btn.textContent='লিংক পাঠানো হচ্ছে…';
     try{
       const {error}=await client.auth.signInWithOtp({email,options:{emailRedirectTo:location.origin+location.pathname,shouldCreateUser:false}});
@@ -151,7 +151,7 @@
   }
   async function sendPhone(){
     const phone=$('etlLoginIdentity').value.trim();
-    if(!/^\\+[1-9]\\d{7,14}$/.test(phone))return authMessage('ফোন নম্বর আন্তর্জাতিক ফরম্যাটে লিখুন, যেমন +8801XXXXXXXXX');
+    if(!/^\+[1-9]\d{7,14}$/.test(phone))return authMessage('ফোন নম্বর আন্তর্জাতিক ফরম্যাটে লিখুন, যেমন +8801XXXXXXXXX');
     const btn=$('etlSendPhone');btn.disabled=true;const old=btn.textContent;btn.textContent='OTP পাঠানো হচ্ছে…';
     try{
       const {error}=await client.auth.signInWithOtp({phone,options:{shouldCreateUser:false}});
@@ -169,8 +169,21 @@
   async function linkEmail(){const email=$('cloudLinkEmail').value.trim();if(!/^\S+@\S+\.\S+$/.test(email))return alert('সঠিক Gmail লিখুন।');const {error}=await client.auth.updateUser({email});alert(error?'Gmail যুক্ত করার অনুরোধ ব্যর্থ: '+error.message:'Gmail-এ নিশ্চিতকরণ লিংক পাঠানো হয়েছে। লিংকে চাপ দিয়ে নিশ্চিত করুন।')}
   async function linkPhone(){const phone=$('cloudLinkPhone').value.trim();if(!/^\+[1-9]\d{7,14}$/.test(phone))return alert('আন্তর্জাতিক ফরম্যাটে নম্বর লিখুন, যেমন +8801XXXXXXXXX');const {error}=await client.auth.updateUser({phone});if(error)return alert('ফোন যুক্ত করার অনুরোধ ব্যর্থ: '+error.message);$('cloudLinkOtp').dataset.kind='phone_change';$('cloudLinkOtp').dataset.identity=phone;alert('ফোনে OTP পাঠানো হয়েছে। কোডটি লিখে OTP যাচাই চাপুন।')}
   async function verifyLinked(){const token=$('cloudLinkOtp').value.trim(),kind=$('cloudLinkOtp').dataset.kind,identity=$('cloudLinkOtp').dataset.identity;if(!token||!kind||!identity)return alert('আগে Gmail বা ফোন যুক্ত করার অনুরোধ পাঠান।');const args=kind==='phone_change'?{phone:identity,token,type:'phone_change'}:{email:identity,token,type:'email_change'};const {error}=await client.auth.verifyOtp(args);alert(error?'যাচাই হয়নি: '+error.message:'বিকল্প পরিচয় যুক্ত হয়েছে। এখন Gmail বা ফোন—দুটির যেকোনোটি দিয়ে একই Cloud অ্যাকাউন্টে প্রবেশ করা যাবে।')}
+  function setLoginButtonsEnabled(enabled){['etlGoogleLogin','etlSendEmail','etlSendPhone','etlVerifyOtp'].forEach(id=>{const b=$(id);if(b)b.disabled=!enabled})}
+  function loadSupabaseFallback(src){return new Promise((resolve,reject)=>{const script=document.createElement('script');script.src=src;script.async=true;script.onload=()=>resolve();script.onerror=()=>reject(new Error('লাইব্রেরি লোড হয়নি: '+src));document.head.appendChild(script);setTimeout(()=>reject(new Error('Supabase লাইব্রেরি লোড হতে সময় শেষ হয়েছে')),12000)})}
   async function init(){
-    if(!configured||!window.supabase?.createClient){status('Cloud key সেটআপ বাকি — লোকাল হিসাব চালু');const el=$('cloudDeviceList');if(el)el.textContent='Supabase key / library সেটআপের পর Cloud Sync চালু হবে।';return}
+    // নিরাপত্তা: Cloud/Auth প্রস্তুত না থাকলে লোকাল ড্যাশবোর্ড কখনো Login ছাড়াই দেখাবেন না।
+    gate(true);showArea('etlLoginFields');authMessage('নিরাপদ Cloud Login প্রস্তুত হচ্ছে…');
+    if(!configured){setLoginButtonsEnabled(false);authMessage('Cloud configuration পাওয়া যায়নি। supabase-config.js ও public key পরীক্ষা প্রয়োজন।');status('Cloud configuration অসম্পূর্ণ — Login বন্ধ');const el=$('cloudDeviceList');if(el)el.textContent='Supabase configuration সম্পূর্ণ না হওয়া পর্যন্ত Cloud Login চালু হবে না।';return}
+    if(!window.supabase?.createClient){
+      try{await loadSupabaseFallback('https://unpkg.com/@supabase/supabase-js@2');}catch(firstError){
+        try{await loadSupabaseFallback('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2');}catch(secondError){
+          setLoginButtonsEnabled(false);authMessage('Supabase Login লাইব্রেরি লোড হয়নি। ইন্টারনেট সংযোগ পরীক্ষা করে পেজ Refresh করুন।');status('Cloud Login লাইব্রেরি পাওয়া যায়নি');console.error(firstError,secondError);return;
+        }
+      }
+    }
+    if(!window.supabase?.createClient){setLoginButtonsEnabled(false);authMessage('Supabase লাইব্রেরি পাওয়া যায়নি। পেজ Refresh করুন।');status('Cloud Login লাইব্রেরি পাওয়া যায়নি');return}
+    setLoginButtonsEnabled(true);
     client=window.supabase.createClient(cfg.url,cfg.anonKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
     $('etlGoogleLogin').onclick=signInGoogle;$('etlSendEmail').onclick=sendEmail;$('etlSendPhone').onclick=sendPhone;$('etlVerifyOtp').onclick=verifyOtp;$('etlCheckApproval').onclick=finishLogin;$('etlTryAgain').onclick=finishLogin;
     $('cloudRefreshDevices').onclick=refreshDevices;$('cloudReloadData').onclick=reloadCloud;$('cloudPushData').onclick=pushLocalToCloud;$('cloudSignOut').onclick=async()=>{if(confirm('এই ডিভাইস থেকে লগআউট করবেন?')){await client.auth.signOut();location.reload()}};
@@ -183,6 +196,7 @@
     const recheck=async()=>{if(!approved||!navigator.onLine)return;try{const st=await rpc('etl_register_device',{p_device_id:deviceId,p_device_name:deviceName(),p_platform:platform()});if(st!=='approved'){approved=false;sessionReady=false;showArea(st==='revoked'?'etlDeniedArea':'etlPendingArea');authMessage('এই ডিভাইসের অনুমোদন আর সক্রিয় নেই।');gate(true)}}catch(e){console.warn('Device approval check:',e.message)}};
     window.addEventListener('online',()=>{recheck();checkRemote();if(approved&&sessionReady)queueSave(localData())});document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){recheck();checkRemote()}});
   }
-  window.etlCloud={init,queueSave,refreshDevices,deviceId};
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
+  async function safeInit(){try{await init()}catch(e){gate(true);showArea('etlLoginFields');setLoginButtonsEnabled(false);authMessage('Cloud Login চালু হয়নি: '+(e?.message||e));status('Cloud Login-এ সমস্যা — হিসাব সুরক্ষিত রাখা হয়েছে');console.error('Eye Touch Link auth init:',e)}}
+  window.etlCloud={init:safeInit,queueSave,refreshDevices,deviceId};
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',safeInit);else safeInit();
 })();

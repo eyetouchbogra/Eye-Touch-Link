@@ -32,3 +32,14 @@ DEPLOY
 4) প্রথমে PC-তে বর্তমান login অক্ষত রেখে পরীক্ষা করুন। তারপর ফোনে Google Login বা Gmail Login Link পরীক্ষা করুন।
 
 নিরাপত্তা: supabase-config.js-এ শুধু public publishable key থাকবে। service_role key, Google Client Secret, OTP বা password কখনো HTML/JS ফাইলে যোগ করবেন না।
+
+
+LOGIN FIX v2 — 12 November 2026
+এই সংশোধিত প্যাকেজে অতিরিক্তভাবে:
+1) Supabase লাইব্রেরি CDN থেকে লোড না হলে বিকল্প CDN চেষ্টা করবে।
+2) Supabase configuration বা library অনুপস্থিত থাকলে Login Gate দৃশ্যমান থাকবে; Login ছাড়া হিসাবের ড্যাশবোর্ড খুলবে না।
+3) Cloud initialization-এ error হলে স্পষ্ট বাংলা error দেখাবে, নীরবে লোকাল ড্যাশবোর্ডে চলে যাবে না।
+4) Gmail ও ফোন OTP-এর input validation regex সংশোধন করা হয়েছে।
+5) cloud-sync.js?v=28 এবং service-worker cache v11।
+
+এই প্যাকেজ deploy করলেই Google OAuth provider নিজে থেকে সক্রিয় হবে না। Supabase Dashboard-এ Google Provider ও Google OAuth Client ID/Secret এবং Redirect URL সঠিকভাবে সেট থাকতে হবে।

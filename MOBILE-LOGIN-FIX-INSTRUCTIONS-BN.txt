@@ -38,3 +38,6 @@ Google provider Enabled থাকতে হবে এবং Google Cloud-এর 
 নিরাপত্তা:
 supabase-config.js-এ থাকা publishable key browser-এ ব্যবহারের জন্য। service_role key বা Google Client Secret কখনো GitHub-এর HTML/JS ফাইলে দেবেন না।
 এই ZIP-এ কোড সংশোধন করা হয়েছে; Supabase/Google Dashboard-এর live OAuth credentials বা settings স্বয়ংক্রিয়ভাবে পরিবর্তন করা হয়নি। Live login পরীক্ষা deploy ও dashboard configuration-এর পরেই করা যাবে।
+
+
+অতিরিক্ত সংশোধন v2 (12 November 2026): Supabase SDK লোড ব্যর্থ হলে বিকল্প CDN চেষ্টা হবে; SDK/configuration অনুপস্থিত থাকলে Login Gate বন্ধ না হয়ে দৃশ্যমান থাকবে এবং স্পষ্ট error দেখাবে। Gmail/Phone OTP validation সংশোধিত। Service Worker cache v11।
