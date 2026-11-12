@@ -1,0 +1,40 @@
+EYE TOUCH LINK — MOBILE GOOGLE LOGIN FIX v1
+তারিখ: 12 November 2026
+
+এই প্যাকেজে মূল সবুজ ডিজাইন, লোগো, হিসাবের কাঠামো, PIN lock, Supabase schema ও Cloud Sync-এর বাকি কোড অপরিবর্তিত রাখা হয়েছে।
+
+কোডে সংশোধন:
+1) Login স্ক্রিনে থাকা “Google দিয়ে প্রবেশ” বাটনের সঙ্গে আসল Supabase Google OAuth action যুক্ত করা হয়েছে। আগের ZIP-এ বাটনটি দৃশ্যমান থাকলেও click handler ছিল না।
+2) Google OAuth-এ redirectTo হিসেবে বর্তমান GitHub Pages app URL পাঠানো হয় এবং Google account বেছে নেওয়ার prompt দেওয়া হয়।
+3) Gmail OTP এবং SMS OTP-তে shouldCreateUser:false দেওয়া হয়েছে, যাতে ভুল করে আলাদা নতুন Supabase user তৈরি না হয়।
+4) Email/SMS অনুরোধে loading এবং স্পষ্ট error message যোগ করা হয়েছে।
+5) cloud-sync.js URL version 27 এবং service-worker cache v10 করা হয়েছে।
+
+GitHub-এ প্রকাশ:
+1) আগে PC-তে বর্তমান হিসাবের JSON Backup রাখুন।
+2) এই ZIP extract করুন।
+3) Extract করা Eye-Touch-Link-main ফোল্ডারের ভেতরের সব ফাইল ও icons ফোল্ডার GitHub repo-এর main/root-এ upload করে একই নামের ফাইল Replace করুন।
+4) GitHub Pages deploy শেষ হলে https://eyetouchbogra.github.io/Eye-Touch-Link/ খুলে Ctrl+F5 দিন।
+5) মোবাইলে Chrome-এ একই URL খুলে পেজ Refresh করুন। এখন Google দিয়ে প্রবেশ বাটন চাপুন।
+
+Supabase URL Configuration:
+Site URL:
+https://eyetouchbogra.github.io
+
+Redirect URLs-এ অবশ্যই যোগ করুন:
+https://eyetouchbogra.github.io/Eye-Touch-Link/
+https://eyetouchbogra.github.io/Eye-Touch-Link/index.html
+
+Google Cloud OAuth Web Client:
+Authorized JavaScript origins:
+https://eyetouchbogra.github.io
+
+Authorized redirect URI:
+https://cmojbhfdtbxvpbjhobbx.supabase.co/auth/v1/callback
+
+Supabase Authentication > Providers > Google:
+Google provider Enabled থাকতে হবে এবং Google Cloud-এর Web Client ID ও Client Secret সেখানে বসানো থাকতে হবে।
+
+নিরাপত্তা:
+supabase-config.js-এ থাকা publishable key browser-এ ব্যবহারের জন্য। service_role key বা Google Client Secret কখনো GitHub-এর HTML/JS ফাইলে দেবেন না।
+এই ZIP-এ কোড সংশোধন করা হয়েছে; Supabase/Google Dashboard-এর live OAuth credentials বা settings স্বয়ংক্রিয়ভাবে পরিবর্তন করা হয়নি। Live login পরীক্ষা deploy ও dashboard configuration-এর পরেই করা যাবে।

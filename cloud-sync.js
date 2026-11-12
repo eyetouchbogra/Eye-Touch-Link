@@ -118,8 +118,49 @@
     }catch(e){status('Cloud সংযোগ সমস্যা: '+e.message);sessionReady=false;gate(false);}
     }finally{loginInProgress=false}
   }
-  async function sendEmail(){const email=$('etlLoginIdentity').value.trim();if(!/^\S+@\S+\.\S+$/.test(email))return authMessage('সঠিক Gmail / ইমেইল লিখুন।');const {error}=await client.auth.signInWithOtp({email,options:{emailRedirectTo:location.origin+location.pathname}});authMessage(error?'ইমেইল পাঠানো যায়নি: '+error.message:'আপনার Gmail-এ Login Link পাঠানো হয়েছে। ইমেইল খুলে একই ফোন/কম্পিউটারের এই ব্রাউজারে লিংকে চাপুন।')}
-  async function sendPhone(){const phone=$('etlLoginIdentity').value.trim();if(!/^\+[1-9]\d{7,14}$/.test(phone))return authMessage('ফোন নম্বর আন্তর্জাতিক ফরম্যাটে লিখুন, যেমন +8801XXXXXXXXX');const {error}=await client.auth.signInWithOtp({phone});if(error)return authMessage('OTP পাঠানো যায়নি: '+error.message);$('etlOtpArea').style.display='block';$('etlOtp').dataset.kind='sms';$('etlOtp').dataset.identity=phone;authMessage('ফোনে OTP পাঠানো হয়েছে। কোড লিখে যাচাই করুন।')}
+  async function signInGoogle(){
+    const btn=$('etlGoogleLogin');
+    if(!btn)return;
+    const old=btn.textContent;
+    btn.disabled=true;btn.textContent='Google-এ সংযোগ হচ্ছে…';
+    authMessage('Google Login চালু হচ্ছে…');
+    try{
+      const {error}=await client.auth.signInWithOAuth({
+        provider:'google',
+        options:{
+          redirectTo:location.origin+location.pathname,
+          queryParams:{prompt:'select_account'}
+        }
+      });
+      if(error)throw error;
+    }catch(e){
+      authMessage('Google Login ব্যর্থ: '+(e.message||e));
+      btn.disabled=false;btn.textContent=old;
+    }
+  }
+  async function sendEmail(){
+    const email=$('etlLoginIdentity').value.trim();
+    if(!/^\\S+@\\S+\\.\\S+$/.test(email))return authMessage('সঠিক Gmail / ইমেইল লিখুন।');
+    const btn=$('etlSendEmail');btn.disabled=true;const old=btn.textContent;btn.textContent='লিংক পাঠানো হচ্ছে…';
+    try{
+      const {error}=await client.auth.signInWithOtp({email,options:{emailRedirectTo:location.origin+location.pathname,shouldCreateUser:false}});
+      if(error)throw error;
+      authMessage('আপনার Gmail-এ Login Link পাঠানো হয়েছে। একই ফোন/কম্পিউটারের এই ব্রাউজারে লিংকটি খুলুন।');
+    }catch(e){authMessage('ইমেইল পাঠানো যায়নি: '+(e.message||e));}
+    finally{btn.disabled=false;btn.textContent=old;}
+  }
+  async function sendPhone(){
+    const phone=$('etlLoginIdentity').value.trim();
+    if(!/^\\+[1-9]\\d{7,14}$/.test(phone))return authMessage('ফোন নম্বর আন্তর্জাতিক ফরম্যাটে লিখুন, যেমন +8801XXXXXXXXX');
+    const btn=$('etlSendPhone');btn.disabled=true;const old=btn.textContent;btn.textContent='OTP পাঠানো হচ্ছে…';
+    try{
+      const {error}=await client.auth.signInWithOtp({phone,options:{shouldCreateUser:false}});
+      if(error)throw error;
+      $('etlOtpArea').style.display='block';$('etlOtp').dataset.kind='sms';$('etlOtp').dataset.identity=phone;
+      authMessage('ফোনে OTP পাঠানো হয়েছে। কোড লিখে যাচাই করুন।');
+    }catch(e){authMessage('OTP পাঠানো যায়নি: '+(e.message||e));}
+    finally{btn.disabled=false;btn.textContent=old;}
+  }
   async function verifyOtp(){const token=$('etlOtp').value.trim(),kind=$('etlOtp').dataset.kind,identity=$('etlOtp').dataset.identity;if(!token||!identity)return authMessage('OTP কোড লিখুন।');const args=kind==='sms'?{phone:identity,token,type:'sms'}:{email:identity,token,type:'email'};const {error}=await client.auth.verifyOtp(args);if(error)return authMessage('OTP যাচাই হয়নি: '+error.message);await finishLogin()}
   async function reloadCloud(){if(!approved)return;try{const c=await rpc('etl_get_cloud_data',{p_device_id:deviceId});if(!c)return alert('Cloud-এ এখনো কোনো হিসাব নেই।');if(!confirm('Cloud-এর হিসাব এই ডিভাইসে বসাবেন? OK দিলে বর্তমান লোকাল হিসাবের JSON Backup ডাউনলোড হবে। Cancel করলে কোনো পরিবর্তন বা Backup হবে না।'))return;backupLocal();window.etlSetDb(c.payload);cloudVersion=c.updated_at;lastSyncedSnapshot=snapshot(c.payload);sessionReady=true;saveFirstSyncDecision('resolved');status('Cloud থেকে হিসাব আনা হয়েছে')}catch(e){alert('Cloud হিসাব আনা যায়নি: '+e.message)}}
   async function pushLocalToCloud(){if(!approved)return;try{const c=await rpc('etl_get_cloud_data',{p_device_id:deviceId});if(c){if(!confirm('Cloud-এ আগে থেকে হিসাব আছে। OK দিলে Cloud হিসাবের Backup ডাউনলোড হবে এবং এরপর এই ডিভাইসের লোকাল হিসাব দিয়ে Cloud প্রতিস্থাপন হবে। Cancel করলে কোনো Backup বা পরিবর্তন হবে না।'))return;backupCloud(c);cloudVersion=await rpc('etl_save_cloud_data',{p_device_id:deviceId,p_payload:localData(),p_expected_updated_at:c.updated_at})}else{if(!confirm('Cloud-এ হিসাব নেই। এই ডিভাইসের লোকাল হিসাব প্রথমবার Cloud-এ সংরক্ষণ করবেন?'))return;cloudVersion=await rpc('etl_save_cloud_data',{p_device_id:deviceId,p_payload:localData(),p_expected_updated_at:null})}lastSyncedSnapshot=snapshot(localData());sessionReady=true;saveFirstSyncDecision('resolved');status('লোকাল হিসাব Cloud-এ সংরক্ষিত হয়েছে')}catch(e){status('Cloud-এ পাঠানো যায়নি: '+e.message);alert('Cloud-এ পাঠানো যায়নি: '+e.message)}}
@@ -131,7 +172,7 @@
   async function init(){
     if(!configured||!window.supabase?.createClient){status('Cloud key সেটআপ বাকি — লোকাল হিসাব চালু');const el=$('cloudDeviceList');if(el)el.textContent='Supabase key / library সেটআপের পর Cloud Sync চালু হবে।';return}
     client=window.supabase.createClient(cfg.url,cfg.anonKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
-    $('etlSendEmail').onclick=sendEmail;$('etlSendPhone').onclick=sendPhone;$('etlVerifyOtp').onclick=verifyOtp;$('etlCheckApproval').onclick=finishLogin;$('etlTryAgain').onclick=finishLogin;
+    $('etlGoogleLogin').onclick=signInGoogle;$('etlSendEmail').onclick=sendEmail;$('etlSendPhone').onclick=sendPhone;$('etlVerifyOtp').onclick=verifyOtp;$('etlCheckApproval').onclick=finishLogin;$('etlTryAgain').onclick=finishLogin;
     $('cloudRefreshDevices').onclick=refreshDevices;$('cloudReloadData').onclick=reloadCloud;$('cloudPushData').onclick=pushLocalToCloud;$('cloudSignOut').onclick=async()=>{if(confirm('এই ডিভাইস থেকে লগআউট করবেন?')){await client.auth.signOut();location.reload()}};
     $('cloudSaveDeviceName').onclick=async()=>{const n=$('cloudDeviceName').value.trim();if(!n)return alert('ডিভাইসের নাম লিখুন।');localStorage.setItem(NAME_KEY,n);if(approved){try{await rpc('etl_register_device',{p_device_id:deviceId,p_device_name:n,p_platform:platform()});await refreshDevices();alert('ডিভাইসের নাম সংরক্ষিত হয়েছে।')}catch(e){alert(e.message)}}};
     $('cloudLinkEmailBtn').onclick=linkEmail;$('cloudLinkPhoneBtn').onclick=linkPhone;$('cloudVerifyLinkBtn').onclick=verifyLinked;
