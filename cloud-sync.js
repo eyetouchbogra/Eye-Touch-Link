@@ -530,7 +530,25 @@
     const recheck=async()=>{if(!approved||!navigator.onLine)return;try{const st=await rpc('etl_register_device',{p_device_id:deviceId,p_device_name:deviceName(),p_platform:platform()});if(st!=='approved'){approved=false;sessionReady=false;showArea(st==='revoked'?'etlDeniedArea':'etlPendingArea');authMessage('এই ডিভাইসের অনুমোদন আর সক্রিয় নেই।');gate(true)}}catch(e){console.warn('Device approval check:',e.message)}};
     window.addEventListener('online',()=>{recheck();checkRemote();if(approved&&sessionReady)queueSave(localData())});document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){recheck();checkRemote()}});
   }
-  async function safeInit(){try{await init()}catch(e){gate(true);showArea('etlLoginFields');authMessage('Cloud Login চালু হয়নি: '+(e?.message||e));status('Cloud Login-এ সমস্যা — হিসাব সুরক্ষিত রাখা হয়েছে');console.error('Eye Touch Link auth init:',e)}}
+  // Notify the local PIN gate only after the initial Cloud/Auth check has settled.
+  // pin-lock.js waits for this signal before deciding whether to show the PIN screen.
+  function markAuthReady(){
+    if(window.etlAuthReady)return;
+    window.etlAuthReady=true;
+    window.dispatchEvent(new Event('etl-auth-ready'));
+  }
+  async function safeInit(){
+    try{
+      await init();
+    }catch(e){
+      gate(true);showArea('etlLoginFields');
+      authMessage('Cloud Login চালু হয়নি: '+(e?.message||e));
+      status('Cloud Login-এ সমস্যা — হিসাব সুরক্ষিত রাখা হয়েছে');
+      console.error('Eye Touch Link auth init:',e);
+    }finally{
+      markAuthReady();
+    }
+  }
   window.etlCloud={init:safeInit,queueSave,refreshDevices,deviceId};
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',safeInit);else safeInit();
 })();
