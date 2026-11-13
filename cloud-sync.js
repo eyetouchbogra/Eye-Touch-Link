@@ -9,14 +9,30 @@
   const configured=!!(cfg.url&&cfg.anonKey&&cfg.anonKey!=='PASTE_SUPABASE_ANON_PUBLIC_KEY_HERE');
   const DEVICE_KEY='etl_device_id_v1',NAME_KEY='etl_device_name_v1';
   const FIRST_SYNC_KEY='etl_first_sync_choice_v1';
+  const OFFLINE_GRANT_KEY='etl_offline_approved_v1';
+  const OFFLINE_GRANT_TTL=30*24*60*60*1000; // refresh approval online at least once every 30 days
   const deviceId=(()=>{let x=localStorage.getItem(DEVICE_KEY);if(!x){x=(crypto.randomUUID?crypto.randomUUID():('etl-'+Date.now()+'-'+Math.random().toString(36).slice(2)));localStorage.setItem(DEVICE_KEY,x)}return x})();
   const platform=()=>/Android/i.test(navigator.userAgent)?'Android':/iPhone|iPad/i.test(navigator.userAgent)?'iOS':/Windows/i.test(navigator.userAgent)?'Windows':'Web';
   const deviceName=()=>localStorage.getItem(NAME_KEY)||(`${platform()} device`);
   let client=null,approved=false,saveTimer=null,cloudBusy=false,sessionReady=false,cloudVersion=null,lastSyncedSnapshot=null,pollBusy=false,loginInProgress=false;
-  let currentUserId=null,loginResolvedUserId=null;
+  let currentUserId=null,loginResolvedUserId=null,offlineMode=false;
   const firstSyncDecisionKey=()=>currentUserId?`${FIRST_SYNC_KEY}:${currentUserId}:${deviceId}`:null;
   const saveFirstSyncDecision=value=>{const key=firstSyncDecisionKey();if(key)localStorage.setItem(key,value)};
-  const status=(msg)=>{const n=$('cloudStatusText');if(n)n.textContent=msg;const h=$('localSaveLabel');if(h)h.textContent=msg.includes('Sync')||msg.includes('সিঙ্ক')?'☁ Cloud Sync':msg.includes('Offline')||msg.includes('অফলাইন')?'● Offline':'☁ '+msg.slice(0,24)};
+  const status=(msg)=>{const n=$('cloudStatusText');if(n)n.textContent=msg;const h=$('localSaveLabel');if(h)h.textContent=msg.includes('Offline')||msg.includes('অফলাইন')?'● Offline':msg.includes('Sync')||msg.includes('সিঙ্ক')?'☁ Cloud Sync':'☁ '+msg.slice(0,24)};
+  function readOfflineGrant(){try{return JSON.parse(localStorage.getItem(OFFLINE_GRANT_KEY)||'null')}catch(_){return null}}
+  function hasOfflineGrant(userId){const g=readOfflineGrant();return !!(g&&g.deviceId===deviceId&&g.userId&&(!userId||g.userId===userId)&&Number(g.expiresAt)>Date.now())}
+  function rememberOfflineApproval(userId){if(!userId)return;localStorage.setItem(OFFLINE_GRANT_KEY,JSON.stringify({userId,deviceId,approvedAt:Date.now(),expiresAt:Date.now()+OFFLINE_GRANT_TTL}))}
+  function clearOfflineApproval(userId){const g=readOfflineGrant();if(!userId||!g||g.userId===userId)localStorage.removeItem(OFFLINE_GRANT_KEY)}
+  function enableOfflineMode(userId){
+    if(!hasOfflineGrant(userId))return false;
+    const g=readOfflineGrant();
+    offlineMode=true;approved=true;sessionReady=false;currentUserId=g.userId;loginResolvedUserId=null;
+    gate(false);
+    status('অফলাইন: এই অনুমোদিত ডিভাইসের লোকাল হিসাব চালু আছে। ইন্টারনেট এলে Sync হবে। ৩০ দিনের মধ্যে অনলাইনে যাচাই করুন।');
+    ['cloudRefreshDevices','cloudReloadData','cloudPushData','cloudSignOut','etlRecoveryCreate','etlRecoveryCopy','cloudSaveDeviceName'].forEach(id=>{const b=$(id);if(b)b.disabled=true});
+    window.addEventListener('online',()=>{status('ইন্টারনেট ফিরেছে; Cloud Sync যাচাই হচ্ছে…');setTimeout(()=>location.reload(),500)},{once:true});
+    return true;
+  }
   const gate=(show)=>{const g=$('etlAuthGate');if(g)g.style.display=show?'flex':'none';const layout=document.querySelector('.layout'),top=document.querySelector('.top');if(layout)layout.style.visibility=show?'hidden':'visible';if(top)top.style.visibility=show?'hidden':'visible'};
   const authMessage=(m)=>{if($('etlAuthMessage'))$('etlAuthMessage').textContent=m};
   // Keep the Password button responsive and diagnostic even when Cloud initialization fails.
@@ -373,15 +389,15 @@
     try{
     const {data:{user}}=await client.auth.getUser();
     updateIdentityStatus(user);
-    if(!user){currentUserId=null;gate(true);return}
+    if(!user){if(enableOfflineMode())return;currentUserId=null;gate(true);return}
     if(loginResolvedUserId===user.id)return;
     currentUserId=user.id;
     let state;
     try{state=await rpc('etl_register_device',{p_device_id:deviceId,p_device_name:deviceName(),p_platform:platform()})}
-    catch(e){authMessage('ডিভাইস নিবন্ধন হয়নি: '+e.message);gate(true);return}
-    if(state==='pending'){approved=false;sessionReady=false;showArea('etlPendingArea');authMessage('এই ডিভাইসটি আপনার অন্য অনুমোদিত ডিভাইস থেকে অনুমোদন করুন।');gate(true);return}
-    if(state==='revoked'){approved=false;sessionReady=false;showArea('etlDeniedArea');authMessage('এই ডিভাইসের প্রবেশাধিকার বাতিল করা হয়েছে।');gate(true);return}
-    approved=true;
+    catch(e){if(enableOfflineMode(user.id))return;authMessage('ডিভাইস নিবন্ধন হয়নি: '+e.message);gate(true);return}
+    if(state==='pending'){clearOfflineApproval(user.id);approved=false;sessionReady=false;showArea('etlPendingArea');authMessage('এই ডিভাইসটি আপনার অন্য অনুমোদিত ডিভাইস থেকে অনুমোদন করুন।');gate(true);return}
+    if(state==='revoked'){clearOfflineApproval(user.id);approved=false;sessionReady=false;showArea('etlDeniedArea');authMessage('এই ডিভাইসের প্রবেশাধিকার বাতিল করা হয়েছে।');gate(true);return}
+    approved=true;rememberOfflineApproval(user.id);offlineMode=false;
     try{
       await resolveFirstSync();
       loginResolvedUserId=user.id;
@@ -576,13 +592,15 @@
   function setLoginButtonsEnabled(enabled){['etlGoogleLogin','etlSendEmail','etlSendPhone','etlVerifyOtp','etlPasswordLogin'].forEach(id=>{const b=$(id);if(b)b.disabled=!enabled})}
   function loadSupabaseFallback(src){return new Promise((resolve,reject)=>{const script=document.createElement('script');script.src=src;script.async=true;script.onload=()=>resolve();script.onerror=()=>reject(new Error('লাইব্রেরি লোড হয়নি: '+src));document.head.appendChild(script);setTimeout(()=>reject(new Error('Supabase লাইব্রেরি লোড হতে সময় শেষ হয়েছে')),12000)})}
   async function init(){
-    // নিরাপত্তা: Cloud/Auth প্রস্তুত না থাকলে লোকাল ড্যাশবোর্ড কখনো Login ছাড়াই দেখাবেন না।
+    // Offline access is limited to this same device after a prior successful online approval.
     gate(true);showArea('etlLoginFields');authMessage('নিরাপদ Cloud Login প্রস্তুত হচ্ছে…');
+    if(!navigator.onLine&&enableOfflineMode())return;
     if(!configured){authMessage('Cloud configuration পাওয়া যায়নি। supabase-config.js ও public key পরীক্ষা প্রয়োজন।');status('Cloud configuration অসম্পূর্ণ — Login বন্ধ');const el=$('cloudDeviceList');if(el)el.textContent='Supabase configuration সম্পূর্ণ না হওয়া পর্যন্ত Cloud Login চালু হবে না।';return}
     if(!window.supabase?.createClient){
       try{await loadSupabaseFallback('https://unpkg.com/@supabase/supabase-js@2');}catch(firstError){
         try{await loadSupabaseFallback('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2');}catch(secondError){
-          authMessage('Supabase Login লাইব্রেরি লোড হয়নি। ইন্টারনেট সংযোগ পরীক্ষা করে পেজ Refresh করুন।');status('Cloud Login লাইব্রেরি পাওয়া যায়নি');console.error(firstError,secondError);return;
+          if(enableOfflineMode())return;
+          authMessage('Supabase Login লাইব্রেরি লোড হয়নি। প্রথমবার অনলাইনে প্রবেশ ও ডিভাইস অনুমোদন প্রয়োজন।');status('Cloud Login লাইব্রেরি পাওয়া যায়নি');console.error(firstError,secondError);return;
         }
       }
     }
@@ -590,7 +608,7 @@
     setLoginButtonsEnabled(true);
     client=window.supabase.createClient(cfg.url,cfg.anonKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
     $('etlGoogleLogin').onclick=signInGoogle;$('cloudSetPassword').onclick=setAccountPassword;$('etlSendEmail').onclick=sendEmail;$('etlSendPhone').onclick=sendPhone;$('etlVerifyOtp').onclick=verifyOtp;$('etlCheckApproval').onclick=finishLogin;$('etlTryAgain').onclick=finishLogin;
-    $('cloudRefreshDevices').onclick=refreshDevices;$('cloudReloadData').onclick=reloadCloud;$('cloudPushData').onclick=pushLocalToCloud;if($('etlRecoveryCreate'))$('etlRecoveryCreate').onclick=createRecoveryCode;if($('etlRecoveryCopy'))$('etlRecoveryCopy').onclick=copyRecoveryCode;if($('etlRecoveryClaimBtn'))$('etlRecoveryClaimBtn').onclick=recoverThisDevice;$('cloudSignOut').onclick=async()=>{if(confirm('এই ডিভাইস থেকে লগআউট করবেন?')){await client.auth.signOut();location.reload()}};
+    $('cloudRefreshDevices').onclick=refreshDevices;$('cloudReloadData').onclick=reloadCloud;$('cloudPushData').onclick=pushLocalToCloud;if($('etlRecoveryCreate'))$('etlRecoveryCreate').onclick=createRecoveryCode;if($('etlRecoveryCopy'))$('etlRecoveryCopy').onclick=copyRecoveryCode;if($('etlRecoveryClaimBtn'))$('etlRecoveryClaimBtn').onclick=recoverThisDevice;$('cloudSignOut').onclick=async()=>{if(confirm('এই ডিভাইস থেকে লগআউট করবেন?')){clearOfflineApproval();await client.auth.signOut();location.reload()}};
     $('cloudSaveDeviceName').onclick=async()=>{const n=$('cloudDeviceName').value.trim();if(!n)return alert('ডিভাইসের নাম লিখুন।');localStorage.setItem(NAME_KEY,n);if(approved){try{await rpc('etl_register_device',{p_device_id:deviceId,p_device_name:n,p_platform:platform()});await refreshDevices();alert('ডিভাইসের নাম সংরক্ষিত হয়েছে।')}catch(e){alert(e.message)}}};
     // Email-link fields are not present in this app's current Settings HTML.
     // Guard them so a missing optional control cannot abort Cloud/Auth initialization.
@@ -599,7 +617,7 @@
     if($('cloudVerifyLinkBtn'))$('cloudVerifyLinkBtn').onclick=verifyLinked;
     const {data:{session}}=await client.auth.getSession();
     if(session){gate(true);authMessage('আপনার ডিভাইস যাচাই করা হচ্ছে...');await finishLogin()}else{showArea('etlLoginFields');gate(true);status('Login প্রয়োজন')}
-    client.auth.onAuthStateChange((event,session)=>{if(event==='SIGNED_IN'&&session){setTimeout(()=>finishLogin().catch(e=>{authMessage('Login সমস্যা: '+e.message)}),0)}if(event==='SIGNED_OUT'){approved=false;sessionReady=false;currentUserId=null;loginResolvedUserId=null;gate(true)}});
+    client.auth.onAuthStateChange((event,session)=>{if(event==='SIGNED_IN'&&session){setTimeout(()=>finishLogin().catch(e=>{authMessage('Login সমস্যা: '+e.message)}),0)}if(event==='SIGNED_OUT'){clearOfflineApproval();approved=false;sessionReady=false;currentUserId=null;loginResolvedUserId=null;gate(true)}});
     setInterval(checkRemote,15000);
     const recheck=async()=>{if(!approved||!navigator.onLine)return;try{const st=await rpc('etl_register_device',{p_device_id:deviceId,p_device_name:deviceName(),p_platform:platform()});if(st!=='approved'){approved=false;sessionReady=false;showArea(st==='revoked'?'etlDeniedArea':'etlPendingArea');authMessage('এই ডিভাইসের অনুমোদন আর সক্রিয় নেই।');gate(true)}}catch(e){console.warn('Device approval check:',e.message)}};
     window.addEventListener('online',()=>{recheck();checkRemote();if(approved&&sessionReady)queueSave(localData())});document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){recheck();checkRemote()}});
@@ -615,6 +633,7 @@
     try{
       await init();
     }catch(e){
+      if(enableOfflineMode())return;
       gate(true);showArea('etlLoginFields');
       authMessage('Cloud Login চালু হয়নি: '+(e?.message||e));
       status('Cloud Login-এ সমস্যা — হিসাব সুরক্ষিত রাখা হয়েছে');

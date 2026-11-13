@@ -1,10 +1,12 @@
-const CACHE = 'eye-touch-link-account-recovery-v20';
-const CORE = [
-  './',
+const CACHE = 'eye-touch-link-offline-v21';
+const REQUIRED = [
   './index.html',
   './supabase-config.js',
-  './cloud-sync.js',
-  './pin-lock.js',
+  './cloud-sync.js?v=36',
+  './pin-lock.js?v=26'
+];
+const OPTIONAL = [
+  './',
   './manifest.webmanifest',
   './icons/icon-192.png',
   './icons/icon-512.png',
@@ -12,8 +14,16 @@ const CORE = [
 ];
 
 self.addEventListener('install', event => {
-  event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(CORE)));
-  self.skipWaiting();
+  event.waitUntil((async () => {
+    const cache = await caches.open(CACHE);
+    // These files are essential for opening the local ledger. Fail installation if any is missing.
+    await cache.addAll(REQUIRED);
+    // Missing decorative/manifest assets must not prevent offline app startup.
+    await Promise.all(OPTIONAL.map(async path => {
+      try { await cache.add(path); } catch (error) { console.warn('Optional app-shell cache skipped:', path, error); }
+    }));
+    await self.skipWaiting();
+  })());
 });
 
 self.addEventListener('activate', event => {
@@ -36,11 +46,12 @@ self.addEventListener('fetch', event => {
         const fresh = await fetch(request);
         if (fresh && fresh.ok) {
           const cache = await caches.open(CACHE);
-          cache.put('./index.html', fresh.clone());
+          await cache.put(new URL('./index.html', self.registration.scope).href, fresh.clone());
         }
         return fresh;
       } catch (_) {
-        return (await caches.match('./index.html')) || Response.error();
+        const cached = await caches.match(request) || await caches.match(new URL('./index.html', self.registration.scope).href);
+        return cached || Response.error();
       }
     })());
     return;
@@ -54,7 +65,7 @@ self.addEventListener('fetch', event => {
       if (fresh && fresh.ok) (await caches.open(CACHE)).put(request, fresh.clone());
       return fresh;
     } catch (_) {
-      return cached || Response.error();
+      return Response.error();
     }
   })());
 });
