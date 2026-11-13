@@ -40,12 +40,54 @@
   const rpc=async(name,args)=>{const {data,error}=await client.rpc(name,args);if(error)throw error;return data};
   const localData=()=>window.etlGetDb?.()||null;
   const hasLocal=()=>{const d=localData();return !!(d&&(d.tx?.length||d.debts?.length||d.ledger?.length||d.people?.length))};
-  const snapshot=d=>JSON.stringify(d??null);
+  // PostgreSQL JSONB may return object keys in a different order from
+  // localStorage. Compare canonical JSON so equivalent ledgers are not
+  // incorrectly treated as separate local and Cloud accounts.
+  const stableSerialize=value=>{
+    if(value===null || typeof value!=='object') return JSON.stringify(value);
+    if(Array.isArray(value)) return '['+value.map(stableSerialize).join(',')+']';
+    return '{'+Object.keys(value).sort().map(key=>JSON.stringify(key)+':'+stableSerialize(value[key])).join(',')+'}';
+  };
+  const snapshot=d=>stableSerialize(d??null);
   const same=(a,b)=>snapshot(a)===snapshot(b);
+  // Persist only a compact fingerprint of the last successfully synced data.
+  // This lets each device identify whether local or Cloud changed after a reload.
+  const SYNC_BASELINE_KEY='etl_sync_baseline_v1';
+  const syncBaselineStorageKey=()=>currentUserId?`${SYNC_BASELINE_KEY}:${currentUserId}:${deviceId}`:null;
+  function fingerprint(data){
+    const value=snapshot(data);
+    let h1=2166136261,h2=0x9e3779b9;
+    for(let i=0;i<value.length;i++){
+      const c=value.charCodeAt(i);
+      h1=Math.imul(h1^c,16777619);
+      h2=Math.imul(h2^c,2246822519);
+    }
+    return value.length+':'+(h1>>>0).toString(16)+':'+(h2>>>0).toString(16);
+  }
+  function readSyncBaseline(){
+    const key=syncBaselineStorageKey();
+    if(!key)return null;
+    try{return JSON.parse(localStorage.getItem(key)||'null')}catch(_){return null}
+  }
+  function saveSyncBaseline(payload,updatedAt){
+    const key=syncBaselineStorageKey();
+    const hash=fingerprint(payload);
+    if(key){
+      try{localStorage.setItem(key,JSON.stringify({hash,updatedAt:updatedAt??null,savedAt:Date.now()}))}
+      catch(e){console.warn('Could not persist Eye Touch Link sync baseline:',e.message)}
+    }
+    lastSyncedSnapshot=snapshot(payload);
+    if(updatedAt!==undefined)cloudVersion=updatedAt;
+  }
   function downloadJson(filename,data){const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=filename;a.style.display='none';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),3000)}
   function backupLocal(){const d=localData();if(d)downloadJson('Eye-Touch-Link-local-backup-'+new Date().toISOString().slice(0,10)+'.json',d)}
   function backupCloud(d){if(d?.payload)downloadJson('Eye-Touch-Link-cloud-backup-'+new Date().toISOString().slice(0,10)+'.json',d.payload)}
-  function applyCloud(d){window.etlSetDb(d.payload);cloudVersion=d.updated_at;lastSyncedSnapshot=snapshot(d.payload);status('অন্য ডিভাইসের হিসাব Sync হয়েছে')}
+  function applyCloud(d){
+    window.etlSetDb(d.payload);
+    sessionReady=true;
+    saveSyncBaseline(d.payload,d.updated_at);
+    status('অন্য ডিভাইসের হিসাব Sync হয়েছে');
+  }
   async function refreshDevices() {
     const el = $('cloudDeviceList');
     const btn = $('cloudRefreshDevices');
@@ -155,53 +197,101 @@
     const cloud=await rpc('etl_get_cloud_data',{p_device_id:deviceId});
     const local=localData();
 
-    if(cloud){
-      cloudVersion=cloud.updated_at;
-
-      if(!hasLocal()){
-        applyCloud(cloud);
-        saveFirstSyncDecision('resolved');
-
-      }else if(!same(local,cloud.payload)){
-        // Remember the user's choice for this account on this device.
-        // Cancel never downloads a backup and never replaces local data.
-        if(previousChoice==='keep_local'){
-          sessionReady=false;
-          status('আপনার আগের সিদ্ধান্ত অনুযায়ী লোকাল হিসাব রাখা হয়েছে। Cloud Sync স্থগিত; Settings থেকে নিজে Sync/Restore করুন।');
-          return;
-        }
-        if(previousChoice==='resolved'){
-          sessionReady=false;
-          status('লোকাল ও Cloud হিসাব আলাদা। আপনার লোকাল হিসাব নিরাপদে রাখা হয়েছে; Settings থেকে নিজে Cloud Sync/Restore নির্বাচন করুন।');
-          return;
-        }
-
-        const takeCloud=confirm('এই অ্যাকাউন্টে আগে থেকে Cloud হিসাব আছে এবং এই ডিভাইসেও আলাদা হিসাব আছে।\n\nOK = Cloud হিসাব এই ডিভাইসে আনুন (লোকাল হিসাবের Backup ডাউনলোড হবে)।\nCancel = লোকাল হিসাব রাখুন; কোনো Backup ডাউনলোড হবে না এবং Cloud-এ কিছু পাঠানো হবে না।\n\nদুই হিসাব একসঙ্গে মিশবে না।');
-
-        if(takeCloud){
-          backupLocal();
-          applyCloud(cloud);
-          saveFirstSyncDecision('resolved');
-        }else{
-          saveFirstSyncDecision('keep_local');
-          sessionReady=false;
-          status('লোকাল হিসাব রাখা হয়েছে — Cloud Sync স্থগিত। Settings থেকে পরে Cloud-এ পাঠাতে পারবেন।');
-        }
-
-      }else{
-        lastSyncedSnapshot=snapshot(local);
-        sessionReady=true;
-        saveFirstSyncDecision('resolved');
-        status('Cloud সিঙ্ক সম্পন্ন');
-      }
-
-    }else{
-      // First cloud save for this account.
-      cloudVersion=await rpc('etl_save_cloud_data',{p_device_id:deviceId,p_payload:local||{},p_expected_updated_at:null});
-      lastSyncedSnapshot=snapshot(local);
+    if(!cloud){
+      // First Cloud save for this account.
+      const version=await rpc('etl_save_cloud_data',{p_device_id:deviceId,p_payload:local||{},p_expected_updated_at:null});
       sessionReady=true;
+      saveSyncBaseline(local||{},version);
       saveFirstSyncDecision('resolved');
       status('প্রথম Cloud Backup সম্পন্ন');
+      return;
+    }
+
+    cloudVersion=cloud.updated_at;
+
+    if(!hasLocal()){
+      applyCloud(cloud);
+      saveFirstSyncDecision('resolved');
+      status('Cloud হিসাব এই ডিভাইসে Sync হয়েছে');
+      return;
+    }
+
+    if(same(local,cloud.payload)){
+      sessionReady=true;
+      saveSyncBaseline(local,cloud.updated_at);
+      saveFirstSyncDecision('resolved');
+      status('Cloud সিঙ্ক সম্পন্ন');
+      return;
+    }
+
+    // Keep an explicit user choice to pause syncing, as before.
+    if(previousChoice==='keep_local'){
+      sessionReady=false;
+      status('আপনার আগের সিদ্ধান্ত অনুযায়ী লোকাল হিসাব রাখা হয়েছে। Settings থেকে Cloud Sync/Restore নির্বাচন করুন।');
+      return;
+    }
+
+    const baseline=readSyncBaseline();
+    if(baseline?.hash){
+      const localChanged=fingerprint(local)!==baseline.hash;
+      const cloudChanged=fingerprint(cloud.payload)!==baseline.hash;
+
+      if(localChanged && !cloudChanged){
+        // Only this device changed: upload with the Cloud version we just read.
+        const version=await rpc('etl_save_cloud_data',{
+          p_device_id:deviceId,
+          p_payload:local,
+          p_expected_updated_at:cloud.updated_at
+        });
+        sessionReady=true;
+        saveSyncBaseline(local,version);
+        saveFirstSyncDecision('resolved');
+        status('এই ডিভাইসের নতুন হিসাব স্বয়ংক্রিয়ভাবে Cloud-এ সংরক্ষিত হয়েছে');
+        return;
+      }
+
+      if(!localChanged && cloudChanged){
+        // Only Cloud changed: local still matches the last common version.
+        applyCloud(cloud);
+        saveFirstSyncDecision('resolved');
+        status('অন্য ডিভাইসের নতুন হিসাব স্বয়ংক্রিয়ভাবে Sync হয়েছে');
+        return;
+      }
+
+      if(localChanged && cloudChanged){
+        sessionReady=false;
+        status('দুই ডিভাইসে আলাদা পরিবর্তন হয়েছে। কোনো হিসাব মুছে ফেলা হয়নি; Settings থেকে তুলনা করে Sync নির্বাচন করুন।');
+        return;
+      }
+    }
+
+    // Migration for earlier v1.1 builds that stored only the word "resolved"
+    // but did not persist a common sync baseline. The user had selected the
+    // PC Cloud copy as the master; preserve a local backup and re-align to Cloud.
+    if(previousChoice==='resolved'){
+      backupLocal();
+      applyCloud(cloud);
+      saveFirstSyncDecision('resolved');
+      status('আগের Sync মিলিয়ে নেওয়া হয়েছে; এখন স্বয়ংক্রিয় Sync চালু');
+      return;
+    }
+
+    // First encounter of two different copies: ask rather than overwrite silently.
+    const takeCloud=confirm(
+      'এই অ্যাকাউন্টে Cloud হিসাব আছে এবং এই ডিভাইসেও আলাদা হিসাব আছে。\n\n'+
+      'OK = Cloud হিসাব এই ডিভাইসে আনুন (লোকাল Backup ডাউনলোড হবে)。\n'+
+      'Cancel = লোকাল হিসাব রাখুন; স্বয়ংক্রিয় Sync স্থগিত থাকবে。\n\n'+
+      'দুই হিসাব একসঙ্গে মিশবে না。'
+    );
+    if(takeCloud){
+      backupLocal();
+      applyCloud(cloud);
+      saveFirstSyncDecision('resolved');
+      status('Cloud থেকে হিসাব আনা হয়েছে; স্বয়ংক্রিয় Sync চালু');
+    }else{
+      saveFirstSyncDecision('keep_local');
+      sessionReady=false;
+      status('লোকাল হিসাব রাখা হয়েছে — Cloud Sync স্থগিত।');
     }
   }
   async function finishLogin(){
@@ -317,10 +407,95 @@
     finally{btn.disabled=false;btn.textContent=old;}
   }
   async function verifyOtp(){const token=$('etlOtp').value.trim(),kind=$('etlOtp').dataset.kind,identity=$('etlOtp').dataset.identity;if(!token||!identity)return authMessage('OTP কোড লিখুন।');const args=kind==='sms'?{phone:identity,token,type:'sms'}:{email:identity,token,type:'email'};const {error}=await client.auth.verifyOtp(args);if(error)return authMessage('OTP যাচাই হয়নি: '+error.message);await finishLogin()}
-  async function reloadCloud(){if(!approved)return;try{const c=await rpc('etl_get_cloud_data',{p_device_id:deviceId});if(!c)return alert('Cloud-এ এখনো কোনো হিসাব নেই।');if(!confirm('Cloud-এর হিসাব এই ডিভাইসে বসাবেন? OK দিলে বর্তমান লোকাল হিসাবের JSON Backup ডাউনলোড হবে। Cancel করলে কোনো পরিবর্তন বা Backup হবে না।'))return;backupLocal();window.etlSetDb(c.payload);cloudVersion=c.updated_at;lastSyncedSnapshot=snapshot(c.payload);sessionReady=true;saveFirstSyncDecision('resolved');status('Cloud থেকে হিসাব আনা হয়েছে')}catch(e){alert('Cloud হিসাব আনা যায়নি: '+e.message)}}
-  async function pushLocalToCloud(){if(!approved)return;try{const c=await rpc('etl_get_cloud_data',{p_device_id:deviceId});if(c){if(!confirm('Cloud-এ আগে থেকে হিসাব আছে। OK দিলে Cloud হিসাবের Backup ডাউনলোড হবে এবং এরপর এই ডিভাইসের লোকাল হিসাব দিয়ে Cloud প্রতিস্থাপন হবে। Cancel করলে কোনো Backup বা পরিবর্তন হবে না।'))return;backupCloud(c);cloudVersion=await rpc('etl_save_cloud_data',{p_device_id:deviceId,p_payload:localData(),p_expected_updated_at:c.updated_at})}else{if(!confirm('Cloud-এ হিসাব নেই। এই ডিভাইসের লোকাল হিসাব প্রথমবার Cloud-এ সংরক্ষণ করবেন?'))return;cloudVersion=await rpc('etl_save_cloud_data',{p_device_id:deviceId,p_payload:localData(),p_expected_updated_at:null})}lastSyncedSnapshot=snapshot(localData());sessionReady=true;saveFirstSyncDecision('resolved');status('লোকাল হিসাব Cloud-এ সংরক্ষিত হয়েছে')}catch(e){status('Cloud-এ পাঠানো যায়নি: '+e.message);alert('Cloud-এ পাঠানো যায়নি: '+e.message)}}
-  async function checkRemote(){if(!client||!approved||!sessionReady||!navigator.onLine||pollBusy)return;pollBusy=true;try{const remote=await rpc('etl_get_cloud_data',{p_device_id:deviceId});if(!remote||remote.updated_at===cloudVersion)return;const local=localData();if(same(local,lastSyncedSnapshot)){applyCloud(remote)}else{status('অন্য ডিভাইসে নতুন হিসাব আছে — Settings থেকে Cloud হিসাব আনুন; আপনার লোকাল পরিবর্তন মুছে ফেলা হয়নি।')}}catch(e){if(navigator.onLine)console.warn('Cloud refresh:',e.message)}finally{pollBusy=false}}
-  function queueSave(data){if(!configured||!client||!approved||!sessionReady)return;clearTimeout(saveTimer);saveTimer=setTimeout(async()=>{if(cloudBusy){queueSave(localData());return}cloudBusy=true;try{cloudVersion=await rpc('etl_save_cloud_data',{p_device_id:deviceId,p_payload:data,p_expected_updated_at:cloudVersion});lastSyncedSnapshot=snapshot(data);status('Cloud সিঙ্ক সম্পন্ন')}catch(e){status(e.message.includes('CLOUD_CONFLICT')?'অন্য ডিভাইসে পরিবর্তন হয়েছে — Settings থেকে Cloud হিসাব আনুন':'অফলাইন / Sync অপেক্ষমাণ');console.warn('Eye Touch Link cloud save:',e.message)}finally{cloudBusy=false}},900)}
+  async function reloadCloud(){
+    if(!approved)return;
+    try{
+      const c=await rpc('etl_get_cloud_data',{p_device_id:deviceId});
+      if(!c)return alert('Cloud-এ এখনো কোনো হিসাব নেই।');
+      if(!confirm('Cloud-এর হিসাব এই ডিভাইসে বসাবেন? OK দিলে বর্তমান লোকাল হিসাবের JSON Backup ডাউনলোড হবে। Cancel করলে কোনো পরিবর্তন হবে না。'))return;
+      backupLocal();
+      applyCloud(c);
+      saveFirstSyncDecision('resolved');
+      status('Cloud থেকে হিসাব আনা হয়েছে; স্বয়ংক্রিয় Sync চালু');
+    }catch(e){alert('Cloud হিসাব আনা যায়নি: '+e.message)}
+  }
+  async function pushLocalToCloud(){
+    if(!approved)return;
+    try{
+      const c=await rpc('etl_get_cloud_data',{p_device_id:deviceId});
+      let version;
+      if(c){
+        if(!confirm('Cloud-এ আগে থেকে হিসাব আছে। OK দিলে Cloud হিসাবের Backup ডাউনলোড হবে এবং এরপর এই ডিভাইসের লোকাল হিসাব দিয়ে Cloud প্রতিস্থাপন হবে। Cancel করলে কোনো পরিবর্তন হবে না。'))return;
+        backupCloud(c);
+        version=await rpc('etl_save_cloud_data',{p_device_id:deviceId,p_payload:localData(),p_expected_updated_at:c.updated_at});
+      }else{
+        if(!confirm('Cloud-এ হিসাব নেই। এই ডিভাইসের লোকাল হিসাব প্রথমবার Cloud-এ সংরক্ষণ করবেন?'))return;
+        version=await rpc('etl_save_cloud_data',{p_device_id:deviceId,p_payload:localData(),p_expected_updated_at:null});
+      }
+      sessionReady=true;
+      saveSyncBaseline(localData(),version);
+      saveFirstSyncDecision('resolved');
+      status('লোকাল হিসাব Cloud-এ সংরক্ষিত হয়েছে; স্বয়ংক্রিয় Sync চালু');
+    }catch(e){status('Cloud-এ পাঠানো যায়নি: '+e.message);alert('Cloud-এ পাঠানো যায়নি: '+e.message)}
+  }
+  async function checkRemote(){
+    if(!client||!approved||!sessionReady||!navigator.onLine||pollBusy)return;
+    pollBusy=true;
+    try{
+      const remote=await rpc('etl_get_cloud_data',{p_device_id:deviceId});
+      if(!remote)return;
+      if(remote.updated_at===cloudVersion)return;
+      const local=localData();
+      const baseline=readSyncBaseline();
+      if(!baseline?.hash){
+        if(lastSyncedSnapshot!==null && same(local,JSON.parse(lastSyncedSnapshot))){
+          applyCloud(remote);
+        }else{
+          status('Cloud-এর আগের Sync ভিত্তি পাওয়া যায়নি; Settings থেকে একবার Cloud হিসাব আনুন।');
+        }
+        return;
+      }
+      const localChanged=fingerprint(local)!==baseline.hash;
+      const cloudChanged=fingerprint(remote.payload)!==baseline.hash;
+      if(!localChanged && cloudChanged){
+        applyCloud(remote);
+        status('অন্য ডিভাইসের নতুন হিসাব স্বয়ংক্রিয়ভাবে Sync হয়েছে');
+      }else if(localChanged && !cloudChanged){
+        // Cloud version changed but its data did not; retry local save against fresh version.
+        cloudVersion=remote.updated_at;
+        queueSave(local);
+      }else if(localChanged && cloudChanged){
+        status('দুই ডিভাইসে আলাদা পরিবর্তন হয়েছে। কোনো হিসাব মুছে ফেলা হয়নি; Settings থেকে তুলনা করে Sync নির্বাচন করুন।');
+      }else{
+        saveSyncBaseline(local,remote.updated_at);
+      }
+    }catch(e){if(navigator.onLine)console.warn('Cloud refresh:',e.message)}
+    finally{pollBusy=false}
+  }
+  function queueSave(data){
+    if(!configured||!client||!approved||!sessionReady)return;
+    clearTimeout(saveTimer);
+    saveTimer=setTimeout(async()=>{
+      if(cloudBusy){queueSave(localData());return}
+      cloudBusy=true;
+      try{
+        const payload=data??localData();
+        const version=await rpc('etl_save_cloud_data',{
+          p_device_id:deviceId,
+          p_payload:payload,
+          p_expected_updated_at:cloudVersion
+        });
+        sessionReady=true;
+        saveSyncBaseline(payload,version);
+        saveFirstSyncDecision('resolved');
+        status('Cloud সিঙ্ক সম্পন্ন');
+      }catch(e){
+        const conflict=String(e.message||e).includes('CLOUD_CONFLICT');
+        status(conflict?'অন্য ডিভাইসে একই সময়ে পরিবর্তন হয়েছে — কোনো হিসাব মুছে ফেলা হয়নি; Settings থেকে Sync নির্বাচন করুন':'অফলাইন / Sync অপেক্ষমাণ: '+(e.message||e));
+        console.warn('Eye Touch Link cloud save:',e.message);
+      }finally{cloudBusy=false}
+    },900);
+  }
   async function linkEmail(){const email=$('cloudLinkEmail').value.trim();if(!/^\S+@\S+\.\S+$/.test(email))return alert('সঠিক Gmail লিখুন।');const {error}=await client.auth.updateUser({email});alert(error?'Gmail যুক্ত করার অনুরোধ ব্যর্থ: '+error.message:'Gmail-এ নিশ্চিতকরণ লিংক পাঠানো হয়েছে। লিংকে চাপ দিয়ে নিশ্চিত করুন।')}
   async function linkPhone(){const phone=$('cloudLinkPhone').value.trim();if(!/^\+[1-9]\d{7,14}$/.test(phone))return alert('আন্তর্জাতিক ফরম্যাটে নম্বর লিখুন, যেমন +8801XXXXXXXXX');const {error}=await client.auth.updateUser({phone});if(error)return alert('ফোন যুক্ত করার অনুরোধ ব্যর্থ: '+error.message);$('cloudLinkOtp').dataset.kind='phone_change';$('cloudLinkOtp').dataset.identity=phone;alert('ফোনে OTP পাঠানো হয়েছে। কোডটি লিখে OTP যাচাই চাপুন।')}
   async function verifyLinked(){const token=$('cloudLinkOtp').value.trim(),kind=$('cloudLinkOtp').dataset.kind,identity=$('cloudLinkOtp').dataset.identity;if(!token||!kind||!identity)return alert('আগে Gmail বা ফোন যুক্ত করার অনুরোধ পাঠান।');const args=kind==='phone_change'?{phone:identity,token,type:'phone_change'}:{email:identity,token,type:'email_change'};const {error}=await client.auth.verifyOtp(args);if(error)return alert('যাচাই হয়নি: '+error.message);const {data:{user}}=await client.auth.getUser();updateIdentityStatus(user);alert('বিকল্প পরিচয় যুক্ত হয়েছে। এখন Gmail বা ফোন—দুটির যেকোনোটি দিয়ে একই Cloud অ্যাকাউন্টে প্রবেশ করা যাবে।')}
