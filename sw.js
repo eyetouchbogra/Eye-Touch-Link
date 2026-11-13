@@ -1,4 +1,4 @@
-const CACHE = 'eye-touch-link-auto-sync-v19';
+const CACHE = 'eye-touch-link-account-recovery-v20';
 const CORE = [
   './',
   './index.html',

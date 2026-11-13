@@ -36,8 +36,81 @@
     const google=providers.has('google')?'Google Login সংযুক্ত':'এই Login-এ Google পরিচয় পাওয়া যায়নি';
     el.textContent=email+' · '+phone+' · '+google;
   }
-  const showArea=(which)=>{['etlLoginFields','etlPendingArea','etlDeniedArea'].forEach(id=>{if($(id))$(id).style.display=id===which?'block':'none'})};
+  const showArea=(which)=>{['etlLoginFields','etlPendingArea','etlDeniedArea'].forEach(id=>{if($(id))$(id).style.display=id===which?'block':'none'});const recovery=$('etlRecoveryClaimArea');if(recovery)recovery.style.display=(which==='etlPendingArea'||which==='etlDeniedArea')?'block':'none'};
   const rpc=async(name,args)=>{const {data,error}=await client.rpc(name,args);if(error)throw error;return data};
+  const RECOVERY_ALPHABET='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  function makeRecoveryCode(){
+    if(!window.crypto?.getRandomValues)throw new Error('এই ব্রাউজারে নিরাপদ Recovery Code তৈরি করা যাচ্ছে না।');
+    const bytes=new Uint8Array(24);window.crypto.getRandomValues(bytes);
+    const raw=Array.from(bytes,b=>RECOVERY_ALPHABET[b&31]).join('');
+    return raw.match(/.{1,4}/g).join('-');
+  }
+  function normaliseRecoveryCode(value){return String(value||'').toUpperCase().replace(/[^A-Z2-9]/g,'')}
+  async function recoveryHash(value){
+    if(!window.crypto?.subtle)throw new Error('নিরাপদ Hash তৈরির জন্য HTTPS সংযোগ প্রয়োজন।');
+    const normalized=normaliseRecoveryCode(value);
+    if(normalized.length!==24)throw new Error('Recovery Code-এর ২৪টি অক্ষর ঠিকভাবে লিখুন।');
+    const digest=await window.crypto.subtle.digest('SHA-256',new TextEncoder().encode(normalized));
+    return Array.from(new Uint8Array(digest),b=>b.toString(16).padStart(2,'0')).join('');
+  }
+  async function refreshRecoveryStatus(){
+    const el=$('etlRecoveryStatus');if(!el||!approved||!client)return;
+    try{
+      const exists=await rpc('etl_recovery_status',{p_device_id:deviceId});
+      el.textContent=exists?'Recovery Code তৈরি আছে। জরুরি প্রয়োজনে একবার ব্যবহার করা যাবে।':'এখনো Recovery Code তৈরি করা হয়নি। এখনই একটি তৈরি করে নিরাপদ স্থানে রাখুন।';
+    }catch(e){el.textContent='Recovery সুবিধা প্রস্তুত হয়নি। Supabase Recovery SQL চালানো হয়েছে কি না পরীক্ষা করুন।';console.warn('Recovery status:',e.message)}
+  }
+  async function createRecoveryCode(){
+    if(!approved)return alert('Recovery Code তৈরি করতে অনুমোদিত ডিভাইসে Login থাকতে হবে।');
+    const btn=$('etlRecoveryCreate');const old=btn?.textContent;
+    if(btn){btn.disabled=true;btn.textContent='নিরাপদ কোড তৈরি হচ্ছে...'}
+    try{
+      let exists=false;
+      try{exists=await rpc('etl_recovery_status',{p_device_id:deviceId})}catch(e){throw new Error('Recovery SQL এখনো চালানো হয়নি অথবা সংযোগ সমস্যা: '+e.message)}
+      if(exists&&!confirm('নতুন Recovery Code তৈরি করলে আগের Recovery Code সঙ্গে সঙ্গে বাতিল হবে। নতুন কোডটি নিরাপদে সংরক্ষণ করবেন তো?'))return;
+      const code=makeRecoveryCode();
+      const hash=await recoveryHash(code);
+      await rpc('etl_set_recovery_code',{p_device_id:deviceId,p_code_hash:hash});
+      const box=$('etlRecoveryCodeBox'),input=$('etlRecoveryCodeValue');
+      if(input)input.value=code;
+      if(box)box.style.display='block';
+      const el=$('etlRecoveryStatus');if(el)el.textContent='নতুন Recovery Code তৈরি ও Cloud-এ সংরক্ষিত হয়েছে। কোডটি এখনই নিরাপদ স্থানে লিখে রাখুন।';
+      alert('Recovery Code তৈরি হয়েছে। এটি শুধু এইবার দেখানো হচ্ছে। কোডটি কাগজে লিখে বা নিরাপদ Password Manager-এ রাখুন। কাউকে দেবেন না।');
+    }catch(e){alert('Recovery Code তৈরি হয়নি: '+(e.message||e))}
+    finally{if(btn){btn.disabled=false;btn.textContent=old||'Recovery Code তৈরি / নতুন কোড'}}
+  }
+  async function copyRecoveryCode(){
+    const value=$('etlRecoveryCodeValue')?.value||'';if(!value)return;
+    try{await navigator.clipboard.writeText(value);alert('Recovery Code কপি হয়েছে। নিরাপদ জায়গায় সংরক্ষণ করুন।')}
+    catch(_){const input=$('etlRecoveryCodeValue');input.focus();input.select();alert('কোডটি নির্বাচন করা হয়েছে। Ctrl+C চাপুন।')}
+  }
+  async function recoverThisDevice(){
+    const input=$('etlRecoveryClaimCode');const code=input?.value||'';
+    if(!code.trim())return alert('আগে তৈরি করা Recovery Code লিখুন।');
+    if(!confirm('Recovery Code একবার ব্যবহার হবে। সফল হলে এই অ্যাকাউন্টের অন্য সব ডিভাইসের অনুমোদন বাতিল হবে। Cloud-এর হিসাব মুছবে না। এই ডিভাইসটি চালু করবেন?'))return;
+    const btn=$('etlRecoveryClaimBtn');const old=btn?.textContent;
+    if(btn){btn.disabled=true;btn.textContent='Recovery যাচাই হচ্ছে...'}
+    try{
+      const hash=await recoveryHash(code);
+      const result=await rpc('etl_recover_device',{p_device_id:deviceId,p_code_hash:hash});
+      if(result==='RECOVERED'){
+        if(input)input.value='';
+        // Clear any earlier in-memory approval result before re-running login.
+        // This also covers a device that was approved earlier in this same tab
+        // and subsequently revoked from another device.
+        approved=false;
+        sessionReady=false;
+        loginResolvedUserId=null;
+        alert('Recovery সফল হয়েছে। এই ডিভাইস অনুমোদিত হয়েছে। এখন Cloud-এর হিসাব আনা হচ্ছে। পুরোনো ডিভাইসগুলো আবার অনুমোদন করতে হবে।');
+        await finishLogin();
+      }else if(result==='INVALID')alert('Recovery Code সঠিক নয়। আবার দেখে লিখুন।');
+      else if(result==='LOCKED')alert('নিরাপত্তার কারণে Recovery সাময়িকভাবে ৩০ মিনিট বন্ধ আছে। পরে আবার চেষ্টা করুন।');
+      else if(result==='NO_CODE')alert('এই অ্যাকাউন্টে Recovery Code তৈরি করা নেই, অথবা কোডটি আগে ব্যবহার হয়েছে।');
+      else if(result==='NOT_PENDING')alert('এই ডিভাইসটি Recovery-এর অপেক্ষায় নেই। পেজ Refresh করে আবার চেষ্টা করুন।');
+      else alert('Recovery সম্পন্ন হয়নি। আবার চেষ্টা করুন।');
+    }catch(e){alert('Recovery ব্যর্থ: '+(e.message||e))}
+    finally{if(btn){btn.disabled=false;btn.textContent=old||'Recovery Code দিয়ে এই ডিভাইস চালু করুন'}}
+  }
   const localData=()=>window.etlGetDb?.()||null;
   const hasLocal=()=>{const d=localData();return !!(d&&(d.tx?.length||d.debts?.length||d.ledger?.length||d.people?.length))};
   // PostgreSQL JSONB may return object keys in a different order from
@@ -315,6 +388,7 @@
       gate(false);
       if($('cloudDeviceName'))$('cloudDeviceName').value=deviceName();
       await refreshDevices();
+      await refreshRecoveryStatus();
     }catch(e){status('Cloud সংযোগ সমস্যা: '+e.message);sessionReady=false;gate(false);}
     }finally{loginInProgress=false}
   }
@@ -516,7 +590,7 @@
     setLoginButtonsEnabled(true);
     client=window.supabase.createClient(cfg.url,cfg.anonKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
     $('etlGoogleLogin').onclick=signInGoogle;$('cloudSetPassword').onclick=setAccountPassword;$('etlSendEmail').onclick=sendEmail;$('etlSendPhone').onclick=sendPhone;$('etlVerifyOtp').onclick=verifyOtp;$('etlCheckApproval').onclick=finishLogin;$('etlTryAgain').onclick=finishLogin;
-    $('cloudRefreshDevices').onclick=refreshDevices;$('cloudReloadData').onclick=reloadCloud;$('cloudPushData').onclick=pushLocalToCloud;$('cloudSignOut').onclick=async()=>{if(confirm('এই ডিভাইস থেকে লগআউট করবেন?')){await client.auth.signOut();location.reload()}};
+    $('cloudRefreshDevices').onclick=refreshDevices;$('cloudReloadData').onclick=reloadCloud;$('cloudPushData').onclick=pushLocalToCloud;if($('etlRecoveryCreate'))$('etlRecoveryCreate').onclick=createRecoveryCode;if($('etlRecoveryCopy'))$('etlRecoveryCopy').onclick=copyRecoveryCode;if($('etlRecoveryClaimBtn'))$('etlRecoveryClaimBtn').onclick=recoverThisDevice;$('cloudSignOut').onclick=async()=>{if(confirm('এই ডিভাইস থেকে লগআউট করবেন?')){await client.auth.signOut();location.reload()}};
     $('cloudSaveDeviceName').onclick=async()=>{const n=$('cloudDeviceName').value.trim();if(!n)return alert('ডিভাইসের নাম লিখুন।');localStorage.setItem(NAME_KEY,n);if(approved){try{await rpc('etl_register_device',{p_device_id:deviceId,p_device_name:n,p_platform:platform()});await refreshDevices();alert('ডিভাইসের নাম সংরক্ষিত হয়েছে।')}catch(e){alert(e.message)}}};
     // Email-link fields are not present in this app's current Settings HTML.
     // Guard them so a missing optional control cannot abort Cloud/Auth initialization.
