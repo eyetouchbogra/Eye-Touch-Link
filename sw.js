@@ -1,4 +1,4 @@
-const CACHE = 'eye-touch-link-cloud-v15';
+const CACHE = 'eye-touch-link-cloud-v16';
 const CORE = [
   './',
   './index.html',

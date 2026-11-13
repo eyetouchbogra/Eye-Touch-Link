@@ -19,6 +19,13 @@
   const status=(msg)=>{const n=$('cloudStatusText');if(n)n.textContent=msg;const h=$('localSaveLabel');if(h)h.textContent=msg.includes('Sync')||msg.includes('সিঙ্ক')?'☁ Cloud Sync':msg.includes('Offline')||msg.includes('অফলাইন')?'● Offline':'☁ '+msg.slice(0,24)};
   const gate=(show)=>{const g=$('etlAuthGate');if(g)g.style.display=show?'flex':'none';const layout=document.querySelector('.layout'),top=document.querySelector('.top');if(layout)layout.style.visibility=show?'hidden':'visible';if(top)top.style.visibility=show?'hidden':'visible'};
   const authMessage=(m)=>{if($('etlAuthMessage'))$('etlAuthMessage').textContent=m};
+  // Keep the Password button responsive and diagnostic even when Cloud initialization fails.
+  document.addEventListener('click',event=>{
+    const button=event.target?.closest?.('#etlPasswordLogin');
+    if(!button)return;
+    event.preventDefault();
+    signInWithPassword().catch(e=>authMessage('Password Login সমস্যা: '+(e?.message||e)));
+  },true);
   function updateIdentityStatus(user){
     const el=$('cloudIdentityStatus');
     if(!el)return;
@@ -247,6 +254,7 @@
     }
   }
   async function signInWithPassword(){
+    if(!client){authMessage('Cloud সংযোগ প্রস্তুত হয়নি। supabase-config.js ও Supabase Login library পরীক্ষা প্রয়োজন।');return;}
     const email=$('etlLoginIdentity').value.trim();
     const password=$('etlLoginPassword').value;
     if(!/^\S+@\S+\.\S+$/.test(email))return authMessage('PC-তে ব্যবহৃত একই Gmail লিখুন।');
@@ -321,18 +329,18 @@
   async function init(){
     // নিরাপত্তা: Cloud/Auth প্রস্তুত না থাকলে লোকাল ড্যাশবোর্ড কখনো Login ছাড়াই দেখাবেন না।
     gate(true);showArea('etlLoginFields');authMessage('নিরাপদ Cloud Login প্রস্তুত হচ্ছে…');
-    if(!configured){setLoginButtonsEnabled(false);authMessage('Cloud configuration পাওয়া যায়নি। supabase-config.js ও public key পরীক্ষা প্রয়োজন।');status('Cloud configuration অসম্পূর্ণ — Login বন্ধ');const el=$('cloudDeviceList');if(el)el.textContent='Supabase configuration সম্পূর্ণ না হওয়া পর্যন্ত Cloud Login চালু হবে না।';return}
+    if(!configured){authMessage('Cloud configuration পাওয়া যায়নি। supabase-config.js ও public key পরীক্ষা প্রয়োজন।');status('Cloud configuration অসম্পূর্ণ — Login বন্ধ');const el=$('cloudDeviceList');if(el)el.textContent='Supabase configuration সম্পূর্ণ না হওয়া পর্যন্ত Cloud Login চালু হবে না।';return}
     if(!window.supabase?.createClient){
       try{await loadSupabaseFallback('https://unpkg.com/@supabase/supabase-js@2');}catch(firstError){
         try{await loadSupabaseFallback('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2');}catch(secondError){
-          setLoginButtonsEnabled(false);authMessage('Supabase Login লাইব্রেরি লোড হয়নি। ইন্টারনেট সংযোগ পরীক্ষা করে পেজ Refresh করুন।');status('Cloud Login লাইব্রেরি পাওয়া যায়নি');console.error(firstError,secondError);return;
+          authMessage('Supabase Login লাইব্রেরি লোড হয়নি। ইন্টারনেট সংযোগ পরীক্ষা করে পেজ Refresh করুন।');status('Cloud Login লাইব্রেরি পাওয়া যায়নি');console.error(firstError,secondError);return;
         }
       }
     }
-    if(!window.supabase?.createClient){setLoginButtonsEnabled(false);authMessage('Supabase লাইব্রেরি পাওয়া যায়নি। পেজ Refresh করুন।');status('Cloud Login লাইব্রেরি পাওয়া যায়নি');return}
+    if(!window.supabase?.createClient){authMessage('Supabase লাইব্রেরি পাওয়া যায়নি। পেজ Refresh করুন।');status('Cloud Login লাইব্রেরি পাওয়া যায়নি');return}
     setLoginButtonsEnabled(true);
     client=window.supabase.createClient(cfg.url,cfg.anonKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
-    $('etlGoogleLogin').onclick=signInGoogle;$('etlPasswordLogin').onclick=signInWithPassword;$('cloudSetPassword').onclick=setAccountPassword;$('etlSendEmail').onclick=sendEmail;$('etlSendPhone').onclick=sendPhone;$('etlVerifyOtp').onclick=verifyOtp;$('etlCheckApproval').onclick=finishLogin;$('etlTryAgain').onclick=finishLogin;
+    $('etlGoogleLogin').onclick=signInGoogle;$('cloudSetPassword').onclick=setAccountPassword;$('etlSendEmail').onclick=sendEmail;$('etlSendPhone').onclick=sendPhone;$('etlVerifyOtp').onclick=verifyOtp;$('etlCheckApproval').onclick=finishLogin;$('etlTryAgain').onclick=finishLogin;
     $('cloudRefreshDevices').onclick=refreshDevices;$('cloudReloadData').onclick=reloadCloud;$('cloudPushData').onclick=pushLocalToCloud;$('cloudSignOut').onclick=async()=>{if(confirm('এই ডিভাইস থেকে লগআউট করবেন?')){await client.auth.signOut();location.reload()}};
     $('cloudSaveDeviceName').onclick=async()=>{const n=$('cloudDeviceName').value.trim();if(!n)return alert('ডিভাইসের নাম লিখুন।');localStorage.setItem(NAME_KEY,n);if(approved){try{await rpc('etl_register_device',{p_device_id:deviceId,p_device_name:n,p_platform:platform()});await refreshDevices();alert('ডিভাইসের নাম সংরক্ষিত হয়েছে।')}catch(e){alert(e.message)}}};
     // Email-link fields are not present in this app's current Settings HTML.
@@ -347,7 +355,7 @@
     const recheck=async()=>{if(!approved||!navigator.onLine)return;try{const st=await rpc('etl_register_device',{p_device_id:deviceId,p_device_name:deviceName(),p_platform:platform()});if(st!=='approved'){approved=false;sessionReady=false;showArea(st==='revoked'?'etlDeniedArea':'etlPendingArea');authMessage('এই ডিভাইসের অনুমোদন আর সক্রিয় নেই।');gate(true)}}catch(e){console.warn('Device approval check:',e.message)}};
     window.addEventListener('online',()=>{recheck();checkRemote();if(approved&&sessionReady)queueSave(localData())});document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){recheck();checkRemote()}});
   }
-  async function safeInit(){try{await init()}catch(e){gate(true);showArea('etlLoginFields');setLoginButtonsEnabled(false);authMessage('Cloud Login চালু হয়নি: '+(e?.message||e));status('Cloud Login-এ সমস্যা — হিসাব সুরক্ষিত রাখা হয়েছে');console.error('Eye Touch Link auth init:',e)}}
+  async function safeInit(){try{await init()}catch(e){gate(true);showArea('etlLoginFields');authMessage('Cloud Login চালু হয়নি: '+(e?.message||e));status('Cloud Login-এ সমস্যা — হিসাব সুরক্ষিত রাখা হয়েছে');console.error('Eye Touch Link auth init:',e)}}
   window.etlCloud={init:safeInit,queueSave,refreshDevices,deviceId};
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',safeInit);else safeInit();
 })();
