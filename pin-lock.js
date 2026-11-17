@@ -4,7 +4,21 @@
  */
 (() => {
   'use strict';
-  const KEY = 'etl_device_pin_v1';
+  const LEGACY_KEY = 'etl_device_pin_v1';
+  const pinKey = () => window.ETL_ACTIVE_USER_ID ? `etl_device_pin_v2:${window.ETL_ACTIVE_USER_ID}` : LEGACY_KEY;
+  // A legacy PIN is migrated only after cloud-sync.js authenticates the same
+  // previously approved Google account and explicitly claims its legacy ledger.
+  function migrateLegacyPinForOwner(userId,allowLegacyClaim){
+    if(!allowLegacyClaim||!userId)return;
+    const target=`etl_device_pin_v2:${userId}`;
+    if(localStorage.getItem(target))return;
+    const old=localStorage.getItem(LEGACY_KEY);
+    if(old)localStorage.setItem(target,old);
+  }
+  window.addEventListener('etl-account-storage-changed',event=>{
+    const detail=event.detail||{};
+    migrateLegacyPinForOwner(detail.userId,detail.claimLegacy===true);
+  });
   // sessionStorage survives a page refresh but is cleared when the tab/session closes.
   const SESSION_KEY = 'etl_pin_unlocked_this_tab_v1';
   const $ = id => document.getElementById(id);
@@ -20,7 +34,7 @@
   `;
   document.head.appendChild(css);
 
-  function record(){try{return JSON.parse(localStorage.getItem(KEY)||'null')}catch(_){return null}}
+  function record(){try{return JSON.parse(localStorage.getItem(pinKey())||'null')}catch(_){return null}}
   function authVisible(){const a=$('etlAuthGate');return !!a && getComputedStyle(a).display!=='none'}
   function setMessage(s){$('etlPinMessage').textContent=s||''}
   function hex(buf){return Array.from(new Uint8Array(buf),b=>b.toString(16).padStart(2,'0')).join('')}
@@ -30,7 +44,7 @@
     const key=await crypto.subtle.importKey('raw',new TextEncoder().encode(pin),'PBKDF2',false,['deriveBits']);
     return hex(await crypto.subtle.deriveBits({name:'PBKDF2',salt,iterations:210000,hash:'SHA-256'},key,256));
   }
-  async function savePin(pin){const salt=crypto.getRandomValues(new Uint8Array(16));const saltHex=hex(salt);const hash=await hashPin(pin,saltHex);localStorage.setItem(KEY,JSON.stringify({version:1,salt:saltHex,hash,iterations:210000}));}
+  async function savePin(pin){const salt=crypto.getRandomValues(new Uint8Array(16));const saltHex=hex(salt);const hash=await hashPin(pin,saltHex);localStorage.setItem(pinKey(),JSON.stringify({version:1,salt:saltHex,hash,iterations:210000}));}
   function revealApp(){try{sessionStorage.setItem(SESSION_KEY,'1')}catch(_){}gate.style.display='none';unlocked=true;document.querySelector('.layout')?.style.removeProperty('visibility');document.querySelector('.top')?.style.removeProperty('visibility');const s=$('etlPinStatus');if(s)s.textContent='এই ডিভাইসে PIN চালু আছে।';resetIdle();}
   function showAppLock(){unlocked=false;try{sessionStorage.removeItem(SESSION_KEY)}catch(_){}gate.style.display='flex';document.querySelector('.layout')?.style.setProperty('visibility','hidden');document.querySelector('.top')?.style.setProperty('visibility','hidden');}
   function setMode(mode){currentMode=mode;const r=record();$('etlPinConfirmWrap').style.display=(mode==='setup'||mode==='new')?'block':'none';$('etlPinTitle').textContent=mode==='setup'?'এই ডিভাইসের জন্য নতুন ৪–১২ সংখ্যার PIN তৈরি করুন।':mode==='change'?'PIN পরিবর্তনের জন্য বর্তমান PIN দিন।':mode==='new'?'নতুন PIN দিন এবং নিশ্চিত করুন।':'আপনার PIN লিখুন।';$('etlPinLabel').textContent=mode==='change'?'বর্তমান PIN':mode==='new'?'নতুন PIN':'PIN';$('etlPinConfirmLabel').textContent='PIN আবার লিখুন';$('etlPinSubmit').textContent=mode==='setup'?'PIN সংরক্ষণ':mode==='change'?'যাচাই করুন':mode==='new'?'নতুন PIN সংরক্ষণ':'প্রবেশ করুন';$('etlPinInput').value='';$('etlPinConfirm').value='';$('etlPinInput').autocomplete='off';setMessage('');}

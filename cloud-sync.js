@@ -1,4 +1,4 @@
-/* Eye Touch Link Cloud Sync v1.1
+/* Eye Touch Link Cloud Sync v1.2 — Google OAuth only
  * Keeps the existing localStorage ledger as the offline copy.
  * Cloud data is only replaced after explicit user confirmation and a backup.
  * Cross-device updates are checked periodically; unsaved local edits are never silently overwritten.
@@ -11,6 +11,8 @@
   const FIRST_SYNC_KEY='etl_first_sync_choice_v1';
   const OFFLINE_GRANT_KEY='etl_offline_approved_v1';
   const OFFLINE_GRANT_TTL=30*24*60*60*1000; // refresh approval online at least once every 30 days
+const bootLegacyGrant=(()=>{try{return JSON.parse(localStorage.getItem(OFFLINE_GRANT_KEY)||'null')}catch(_){return null}})();
+const userOfflineGrantKey=userId=>`etl_offline_approved_v2:${userId}:${deviceId}`;
   const deviceId=(()=>{let x=localStorage.getItem(DEVICE_KEY);if(!x){x=(crypto.randomUUID?crypto.randomUUID():('etl-'+Date.now()+'-'+Math.random().toString(36).slice(2)));localStorage.setItem(DEVICE_KEY,x)}return x})();
   const platform=()=>/Android/i.test(navigator.userAgent)?'Android':/iPhone|iPad/i.test(navigator.userAgent)?'iOS':/Windows/i.test(navigator.userAgent)?'Windows':'Web';
   const deviceName=()=>localStorage.getItem(NAME_KEY)||(`${platform()} device`);
@@ -19,13 +21,20 @@
   const firstSyncDecisionKey=()=>currentUserId?`${FIRST_SYNC_KEY}:${currentUserId}:${deviceId}`:null;
   const saveFirstSyncDecision=value=>{const key=firstSyncDecisionKey();if(key)localStorage.setItem(key,value)};
   const status=(msg)=>{const n=$('cloudStatusText');if(n)n.textContent=msg;const h=$('localSaveLabel');if(h)h.textContent=msg.includes('Offline')||msg.includes('অফলাইন')?'● Offline':msg.includes('Sync')||msg.includes('সিঙ্ক')?'☁ Cloud Sync':'☁ '+msg.slice(0,24)};
-  function readOfflineGrant(){try{return JSON.parse(localStorage.getItem(OFFLINE_GRANT_KEY)||'null')}catch(_){return null}}
-  function hasOfflineGrant(userId){const g=readOfflineGrant();return !!(g&&g.deviceId===deviceId&&g.userId&&(!userId||g.userId===userId)&&Number(g.expiresAt)>Date.now())}
-  function rememberOfflineApproval(userId){if(!userId)return;localStorage.setItem(OFFLINE_GRANT_KEY,JSON.stringify({userId,deviceId,approvedAt:Date.now(),expiresAt:Date.now()+OFFLINE_GRANT_TTL}))}
-  function clearOfflineApproval(userId){const g=readOfflineGrant();if(!userId||!g||g.userId===userId)localStorage.removeItem(OFFLINE_GRANT_KEY)}
+  function readOfflineGrant(userId){
+    try{
+      if(userId){const scoped=JSON.parse(localStorage.getItem(userOfflineGrantKey(userId))||'null');if(scoped)return scoped;if(bootLegacyGrant?.userId===userId)return bootLegacyGrant;return null;}
+      const active=localStorage.getItem('etl_active_user_id')||window.ETL_ACTIVE_USER_ID||bootLegacyGrant?.userId;
+      return active?readOfflineGrant(active):bootLegacyGrant;
+    }catch(_){return null}
+  }
+  function hasOfflineGrant(userId){const target=userId||localStorage.getItem('etl_active_user_id')||window.ETL_ACTIVE_USER_ID||bootLegacyGrant?.userId;const g=readOfflineGrant(target);return !!(g&&g.deviceId===deviceId&&g.userId===target&&Number(g.expiresAt)>Date.now())}
+  function rememberOfflineApproval(userId){if(!userId)return;localStorage.setItem(userOfflineGrantKey(userId),JSON.stringify({userId,deviceId,approvedAt:Date.now(),expiresAt:Date.now()+OFFLINE_GRANT_TTL}))}
+  function clearOfflineApproval(userId){if(userId){localStorage.removeItem(userOfflineGrantKey(userId));if(bootLegacyGrant?.userId===userId)localStorage.removeItem(OFFLINE_GRANT_KEY)}else localStorage.removeItem(OFFLINE_GRANT_KEY)}
   function enableOfflineMode(userId){
-    if(!hasOfflineGrant(userId))return false;
-    const g=readOfflineGrant();
+    const target=userId||localStorage.getItem('etl_active_user_id')||window.ETL_ACTIVE_USER_ID||bootLegacyGrant?.userId;
+    if(!hasOfflineGrant(target))return false;
+    const g=readOfflineGrant(target);
     offlineMode=true;approved=true;sessionReady=false;currentUserId=g.userId;loginResolvedUserId=null;
     gate(false);
     status('অফলাইন: এই অনুমোদিত ডিভাইসের লোকাল হিসাব চালু আছে। ইন্টারনেট এলে Sync হবে। ৩০ দিনের মধ্যে অনলাইনে যাচাই করুন।');
@@ -35,22 +44,12 @@
   }
   const gate=(show)=>{const g=$('etlAuthGate');if(g)g.style.display=show?'flex':'none';const layout=document.querySelector('.layout'),top=document.querySelector('.top');if(layout)layout.style.visibility=show?'hidden':'visible';if(top)top.style.visibility=show?'hidden':'visible'};
   const authMessage=(m)=>{if($('etlAuthMessage'))$('etlAuthMessage').textContent=m};
-  // Keep the Password button responsive and diagnostic even when Cloud initialization fails.
-  document.addEventListener('click',event=>{
-    const button=event.target?.closest?.('#etlPasswordLogin');
-    if(!button)return;
-    event.preventDefault();
-    signInWithPassword().catch(e=>authMessage('Password Login সমস্যা: '+(e?.message||e)));
-  },true);
   function updateIdentityStatus(user){
     const el=$('cloudIdentityStatus');
     if(!el)return;
-    if(!user){el.textContent='এই ডিভাইসে Cloud Login করা হয়নি।';return;}
+    if(!user){el.textContent='এই ডিভাইসে Google Login করা হয়নি।';return;}
     const providers=new Set([...(user.identities||[]).map(x=>x.provider),user.app_metadata?.provider].filter(Boolean));
-    const email=user.email?('Gmail: '+user.email):'Gmail পাওয়া যায়নি';
-    const phone=user.phone?('ফোন যাচাই করা আছে: '+user.phone):'ফোন এখনো যুক্ত/যাচাই করা হয়নি';
-    const google=providers.has('google')?'Google Login সংযুক্ত':'এই Login-এ Google পরিচয় পাওয়া যায়নি';
-    el.textContent=email+' · '+phone+' · '+google;
+    el.textContent=(user.email?('Google Account: '+user.email):'Google Account পাওয়া যায়নি')+' · '+(providers.has('google')?'Google Login সংযুক্ত':'Google পরিচয় যাচাই হয়নি');
   }
   const showArea=(which)=>{['etlLoginFields','etlPendingArea','etlDeniedArea'].forEach(id=>{if($(id))$(id).style.display=id===which?'block':'none'});const recovery=$('etlRecoveryClaimArea');if(recovery)recovery.style.display=(which==='etlPendingArea'||which==='etlDeniedArea')?'block':'none'};
   const rpc=async(name,args)=>{const {data,error}=await client.rpc(name,args);if(error)throw error;return data};
@@ -390,6 +389,12 @@
     const {data:{user}}=await client.auth.getUser();
     updateIdentityStatus(user);
     if(!user){if(enableOfflineMode())return;currentUserId=null;gate(true);return}
+    const providers=new Set([...(user.identities||[]).map(x=>x.provider),user.app_metadata?.provider].filter(Boolean));
+    if(!providers.has('google')){
+      authMessage('শুধু Google Login অনুমোদিত। Google Account দিয়ে আবার প্রবেশ করুন।');
+      approved=false;sessionReady=false;currentUserId=null;loginResolvedUserId=null;
+      await client.auth.signOut();gate(true);showArea('etlLoginFields');return;
+    }
     if(loginResolvedUserId===user.id)return;
     currentUserId=user.id;
     let state;
@@ -397,8 +402,12 @@
     catch(e){if(enableOfflineMode(user.id))return;authMessage('ডিভাইস নিবন্ধন হয়নি: '+e.message);gate(true);return}
     if(state==='pending'){clearOfflineApproval(user.id);approved=false;sessionReady=false;showArea('etlPendingArea');authMessage('এই ডিভাইসটি আপনার অন্য অনুমোদিত ডিভাইস থেকে অনুমোদন করুন।');gate(true);return}
     if(state==='revoked'){clearOfflineApproval(user.id);approved=false;sessionReady=false;showArea('etlDeniedArea');authMessage('এই ডিভাইসের প্রবেশাধিকার বাতিল করা হয়েছে।');gate(true);return}
-    approved=true;rememberOfflineApproval(user.id);offlineMode=false;
+    approved=true;
+    const mayClaimLegacy=!!(bootLegacyGrant&&bootLegacyGrant.userId===user.id&&bootLegacyGrant.deviceId===deviceId&&Number(bootLegacyGrant.expiresAt)>Date.now());
     try{
+      if(typeof window.etlSwitchUserStorage!=='function')throw new Error('ব্যবহারকারীভিত্তিক Local হিসাব ব্যবস্থা পাওয়া যায়নি।');
+      window.etlSwitchUserStorage(user.id,mayClaimLegacy);
+      rememberOfflineApproval(user.id);offlineMode=false;
       await resolveFirstSync();
       loginResolvedUserId=user.id;
       gate(false);
@@ -433,70 +442,6 @@
       btn.disabled=false;btn.textContent=old;
     }
   }
-  async function signInWithPassword(){
-    if(!client){authMessage('Cloud সংযোগ প্রস্তুত হয়নি। supabase-config.js ও Supabase Login library পরীক্ষা প্রয়োজন।');return;}
-    const email=$('etlLoginIdentity').value.trim();
-    const password=$('etlLoginPassword').value;
-    if(!/^\S+@\S+\.\S+$/.test(email))return authMessage('PC-তে ব্যবহৃত একই Gmail লিখুন।');
-    if(!password)return authMessage('Eye Touch Link Password লিখুন।');
-    const btn=$('etlPasswordLogin');
-    const old=btn?.textContent;
-    if(btn){btn.disabled=true;btn.textContent='প্রবেশ যাচাই হচ্ছে…';}
-    try{
-      const {error}=await client.auth.signInWithPassword({email,password});
-      if(error)throw error;
-      authMessage('Password সঠিক। এই ডিভাইসের অনুমোদন যাচাই হচ্ছে…');
-      await finishLogin();
-    }catch(e){
-      authMessage('Gmail + Password দিয়ে প্রবেশ হয়নি: '+(e.message||e));
-    }finally{
-      if(btn){btn.disabled=false;btn.textContent=old||'Gmail + Password দিয়ে প্রবেশ';}
-    }
-  }
-  async function setAccountPassword(){
-    if(!client)return alert('Cloud সংযোগ প্রস্তুত হয়নি।');
-    const p1=$('cloudNewPassword')?.value||'';
-    const p2=$('cloudConfirmPassword')?.value||'';
-    if(p1.length<8)return alert('কমপক্ষে ৮ অক্ষরের Password দিন।');
-    if(p1!==p2)return alert('দুটি Password এক নয়।');
-    try{
-      const {data:{user},error:userError}=await client.auth.getUser();
-      if(userError)throw userError;
-      if(!user||!user.email)return alert('এই PC-তে সক্রিয় Cloud Login পাওয়া যায়নি। আগে PC-তে Google দিয়ে প্রবেশ করুন।');
-      const providers=new Set([...(user.identities||[]).map(x=>x.provider),user.app_metadata?.provider].filter(Boolean));
-      if(!providers.has('google'))return alert('এই PC-র সক্রিয় Cloud অ্যাকাউন্টে Google পরিচয় পাওয়া যায়নি। সঠিক Google-লগইন করা অ্যাকাউন্টে করুন।');
-      const {error}=await client.auth.updateUser({password:p1});
-      if(error)throw error;
-      $('cloudNewPassword').value='';$('cloudConfirmPassword').value='';
-      alert('এই একই Eye Touch Link Cloud অ্যাকাউন্টে Password যুক্ত হয়েছে। এখন ফোনে Google Login না করে একই Gmail ও এই নতুন Password দিয়ে প্রবেশ করুন। এটি Google/Gmail Password নয়।');
-    }catch(e){
-      alert('Password যুক্ত করা যায়নি: '+(e.message||e));
-    }
-  }
-  async function sendEmail(){
-    const email=$('etlLoginIdentity').value.trim();
-    if(!/^\S+@\S+\.\S+$/.test(email))return authMessage('সঠিক Gmail / ইমেইল লিখুন।');
-    const btn=$('etlSendEmail');btn.disabled=true;const old=btn.textContent;btn.textContent='লিংক পাঠানো হচ্ছে…';
-    try{
-      const {error}=await client.auth.signInWithOtp({email,options:{emailRedirectTo:location.origin+location.pathname,shouldCreateUser:false}});
-      if(error)throw error;
-      authMessage('আপনার Gmail-এ Login Link পাঠানো হয়েছে। একই ফোন/কম্পিউটারের এই ব্রাউজারে লিংকটি খুলুন।');
-    }catch(e){authMessage('ইমেইল পাঠানো যায়নি: '+(e.message||e));}
-    finally{btn.disabled=false;btn.textContent=old;}
-  }
-  async function sendPhone(){
-    const phone=$('etlLoginIdentity').value.trim();
-    if(!/^\+[1-9]\d{7,14}$/.test(phone))return authMessage('ফোন নম্বর আন্তর্জাতিক ফরম্যাটে লিখুন, যেমন +8801XXXXXXXXX');
-    const btn=$('etlSendPhone');btn.disabled=true;const old=btn.textContent;btn.textContent='OTP পাঠানো হচ্ছে…';
-    try{
-      const {error}=await client.auth.signInWithOtp({phone,options:{shouldCreateUser:false}});
-      if(error)throw error;
-      $('etlOtpArea').style.display='block';$('etlOtp').dataset.kind='sms';$('etlOtp').dataset.identity=phone;
-      authMessage('ফোনে OTP পাঠানো হয়েছে। কোড লিখে যাচাই করুন।');
-    }catch(e){authMessage('OTP পাঠানো যায়নি: '+(e.message||e));}
-    finally{btn.disabled=false;btn.textContent=old;}
-  }
-  async function verifyOtp(){const token=$('etlOtp').value.trim(),kind=$('etlOtp').dataset.kind,identity=$('etlOtp').dataset.identity;if(!token||!identity)return authMessage('OTP কোড লিখুন।');const args=kind==='sms'?{phone:identity,token,type:'sms'}:{email:identity,token,type:'email'};const {error}=await client.auth.verifyOtp(args);if(error)return authMessage('OTP যাচাই হয়নি: '+error.message);await finishLogin()}
   async function reloadCloud(){
     if(!approved)return;
     try{
@@ -586,10 +531,7 @@
       }finally{cloudBusy=false}
     },900);
   }
-  async function linkEmail(){const email=$('cloudLinkEmail').value.trim();if(!/^\S+@\S+\.\S+$/.test(email))return alert('সঠিক Gmail লিখুন।');const {error}=await client.auth.updateUser({email});alert(error?'Gmail যুক্ত করার অনুরোধ ব্যর্থ: '+error.message:'Gmail-এ নিশ্চিতকরণ লিংক পাঠানো হয়েছে। লিংকে চাপ দিয়ে নিশ্চিত করুন।')}
-  async function linkPhone(){const phone=$('cloudLinkPhone').value.trim();if(!/^\+[1-9]\d{7,14}$/.test(phone))return alert('আন্তর্জাতিক ফরম্যাটে নম্বর লিখুন, যেমন +8801XXXXXXXXX');const {error}=await client.auth.updateUser({phone});if(error)return alert('ফোন যুক্ত করার অনুরোধ ব্যর্থ: '+error.message);$('cloudLinkOtp').dataset.kind='phone_change';$('cloudLinkOtp').dataset.identity=phone;alert('ফোনে OTP পাঠানো হয়েছে। কোডটি লিখে OTP যাচাই চাপুন।')}
-  async function verifyLinked(){const token=$('cloudLinkOtp').value.trim(),kind=$('cloudLinkOtp').dataset.kind,identity=$('cloudLinkOtp').dataset.identity;if(!token||!kind||!identity)return alert('আগে Gmail বা ফোন যুক্ত করার অনুরোধ পাঠান।');const args=kind==='phone_change'?{phone:identity,token,type:'phone_change'}:{email:identity,token,type:'email_change'};const {error}=await client.auth.verifyOtp(args);if(error)return alert('যাচাই হয়নি: '+error.message);const {data:{user}}=await client.auth.getUser();updateIdentityStatus(user);alert('বিকল্প পরিচয় যুক্ত হয়েছে। এখন Gmail বা ফোন—দুটির যেকোনোটি দিয়ে একই Cloud অ্যাকাউন্টে প্রবেশ করা যাবে।')}
-  function setLoginButtonsEnabled(enabled){['etlGoogleLogin','etlSendEmail','etlSendPhone','etlVerifyOtp','etlPasswordLogin'].forEach(id=>{const b=$(id);if(b)b.disabled=!enabled})}
+  function setLoginButtonsEnabled(enabled){['etlGoogleLogin'].forEach(id=>{const b=$(id);if(b)b.disabled=!enabled})}
   function loadSupabaseFallback(src){return new Promise((resolve,reject)=>{const script=document.createElement('script');script.src=src;script.async=true;script.onload=()=>resolve();script.onerror=()=>reject(new Error('লাইব্রেরি লোড হয়নি: '+src));document.head.appendChild(script);setTimeout(()=>reject(new Error('Supabase লাইব্রেরি লোড হতে সময় শেষ হয়েছে')),12000)})}
   async function init(){
     // Offline access is limited to this same device after a prior successful online approval.
@@ -607,17 +549,12 @@
     if(!window.supabase?.createClient){authMessage('Supabase লাইব্রেরি পাওয়া যায়নি। পেজ Refresh করুন।');status('Cloud Login লাইব্রেরি পাওয়া যায়নি');return}
     setLoginButtonsEnabled(true);
     client=window.supabase.createClient(cfg.url,cfg.anonKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
-    $('etlGoogleLogin').onclick=signInGoogle;$('cloudSetPassword').onclick=setAccountPassword;$('etlSendEmail').onclick=sendEmail;$('etlSendPhone').onclick=sendPhone;$('etlVerifyOtp').onclick=verifyOtp;$('etlCheckApproval').onclick=finishLogin;$('etlTryAgain').onclick=finishLogin;
-    $('cloudRefreshDevices').onclick=refreshDevices;$('cloudReloadData').onclick=reloadCloud;$('cloudPushData').onclick=pushLocalToCloud;if($('etlRecoveryCreate'))$('etlRecoveryCreate').onclick=createRecoveryCode;if($('etlRecoveryCopy'))$('etlRecoveryCopy').onclick=copyRecoveryCode;if($('etlRecoveryClaimBtn'))$('etlRecoveryClaimBtn').onclick=recoverThisDevice;$('cloudSignOut').onclick=async()=>{if(confirm('এই ডিভাইস থেকে লগআউট করবেন?')){clearOfflineApproval();await client.auth.signOut();location.reload()}};
+    $('etlGoogleLogin').onclick=signInGoogle;$('etlCheckApproval').onclick=finishLogin;$('etlTryAgain').onclick=finishLogin;
+    $('cloudRefreshDevices').onclick=refreshDevices;$('cloudReloadData').onclick=reloadCloud;$('cloudPushData').onclick=pushLocalToCloud;if($('etlRecoveryCreate'))$('etlRecoveryCreate').onclick=createRecoveryCode;if($('etlRecoveryCopy'))$('etlRecoveryCopy').onclick=copyRecoveryCode;if($('etlRecoveryClaimBtn'))$('etlRecoveryClaimBtn').onclick=recoverThisDevice;$('cloudSignOut').onclick=async()=>{if(confirm('এই ডিভাইস থেকে লগআউট করবেন?')){clearOfflineApproval(currentUserId);await client.auth.signOut();location.reload()}};
     $('cloudSaveDeviceName').onclick=async()=>{const n=$('cloudDeviceName').value.trim();if(!n)return alert('ডিভাইসের নাম লিখুন।');localStorage.setItem(NAME_KEY,n);if(approved){try{await rpc('etl_register_device',{p_device_id:deviceId,p_device_name:n,p_platform:platform()});await refreshDevices();alert('ডিভাইসের নাম সংরক্ষিত হয়েছে।')}catch(e){alert(e.message)}}};
-    // Email-link fields are not present in this app's current Settings HTML.
-    // Guard them so a missing optional control cannot abort Cloud/Auth initialization.
-    if($('cloudLinkEmailBtn'))$('cloudLinkEmailBtn').onclick=linkEmail;
-    if($('cloudLinkPhoneBtn'))$('cloudLinkPhoneBtn').onclick=linkPhone;
-    if($('cloudVerifyLinkBtn'))$('cloudVerifyLinkBtn').onclick=verifyLinked;
     const {data:{session}}=await client.auth.getSession();
     if(session){gate(true);authMessage('আপনার ডিভাইস যাচাই করা হচ্ছে...');await finishLogin()}else{showArea('etlLoginFields');gate(true);status('Login প্রয়োজন')}
-    client.auth.onAuthStateChange((event,session)=>{if(event==='SIGNED_IN'&&session){setTimeout(()=>finishLogin().catch(e=>{authMessage('Login সমস্যা: '+e.message)}),0)}if(event==='SIGNED_OUT'){clearOfflineApproval();approved=false;sessionReady=false;currentUserId=null;loginResolvedUserId=null;gate(true)}});
+    client.auth.onAuthStateChange((event,session)=>{if(event==='SIGNED_IN'&&session){setTimeout(()=>finishLogin().catch(e=>{authMessage('Login সমস্যা: '+e.message)}),0)}if(event==='SIGNED_OUT'){clearOfflineApproval(currentUserId);approved=false;sessionReady=false;currentUserId=null;loginResolvedUserId=null;gate(true)}});
     setInterval(checkRemote,15000);
     const recheck=async()=>{if(!approved||!navigator.onLine)return;try{const st=await rpc('etl_register_device',{p_device_id:deviceId,p_device_name:deviceName(),p_platform:platform()});if(st!=='approved'){approved=false;sessionReady=false;showArea(st==='revoked'?'etlDeniedArea':'etlPendingArea');authMessage('এই ডিভাইসের অনুমোদন আর সক্রিয় নেই।');gate(true)}}catch(e){console.warn('Device approval check:',e.message)}};
     window.addEventListener('online',()=>{recheck();checkRemote();if(approved&&sessionReady)queueSave(localData())});document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){recheck();checkRemote()}});
