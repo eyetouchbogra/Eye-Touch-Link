@@ -122,6 +122,21 @@
   async function sendEmail(){const email=$('etlLoginIdentity').value.trim();if(!/^\S+@\S+\.\S+$/.test(email))return authMessage('সঠিক Gmail / ইমেইল লিখুন।');const {error}=await client.auth.signInWithOtp({email,options:{emailRedirectTo:location.origin+location.pathname}});authMessage(error?'ইমেইল পাঠানো যায়নি: '+error.message:'আপনার Gmail-এ Login Link পাঠানো হয়েছে। ইমেইল খুলে একই ফোন/কম্পিউটারের এই ব্রাউজারে লিংকে চাপুন।')}
   async function sendPhone(){const phone=$('etlLoginIdentity').value.trim();if(!/^\+[1-9]\d{7,14}$/.test(phone))return authMessage('ফোন নম্বর আন্তর্জাতিক ফরম্যাটে লিখুন, যেমন +8801XXXXXXXXX');const {error}=await client.auth.signInWithOtp({phone});if(error)return authMessage('OTP পাঠানো যায়নি: '+error.message);$('etlOtpArea').style.display='block';$('etlOtp').dataset.kind='sms';$('etlOtp').dataset.identity=phone;authMessage('ফোনে OTP পাঠানো হয়েছে। কোড লিখে যাচাই করুন।')}
   async function verifyOtp(){const token=$('etlOtp').value.trim(),kind=$('etlOtp').dataset.kind,identity=$('etlOtp').dataset.identity;if(!token||!identity)return authMessage('OTP কোড লিখুন।');const args=kind==='sms'?{phone:identity,token,type:'sms'}:{email:identity,token,type:'email'};const {error}=await client.auth.verifyOtp(args);if(error)return authMessage('OTP যাচাই হয়নি: '+error.message);await finishLogin()}
+  async function inspectCloudData(){
+    if(!approved)return alert('এই ডিভাইসটি Cloud-এ অনুমোদিত নয়।');
+    try{
+      status('Cloud-এর হিসাব শুধু পড়া হচ্ছে...');
+      const c=await rpc('etl_get_cloud_data',{p_device_id:deviceId});
+      if(!c){alert('Cloud-এ এখনো কোনো হিসাব সংরক্ষিত নেই।');return}
+      const d=c.payload||{};
+      const payments=(d.debts||[]).reduce((n,x)=>n+(Array.isArray(x.payments)?x.payments.length:0),0);
+      const additions=(d.debts||[]).reduce((n,x)=>n+(Array.isArray(x.additions)?x.additions.length:0),0);
+      const holidays=(d.debts||[]).reduce((n,x)=>n+(Array.isArray(x.holidays)?x.holidays.length:0),0);
+      const msg='Cloud-এ বর্তমানে সংরক্ষিত হিসাব (শুধু দেখা হয়েছে; কোনো পরিবর্তন হয়নি):\n\nলেনদেন: '+(d.tx||[]).length+'\nলোন/ধার হিসাব: '+(d.debts||[]).length+'\nকিস্তি/পেমেন্ট: '+payments+'\nঅতিরিক্ত লোন/ধার: '+additions+'\nছুটি/স্থগিত: '+holidays+'\nনামভিত্তিক লেজার: '+(d.ledger||[]).length+'\nব্যক্তি/নাম: '+(d.people||[]).length+'\n\nসর্বশেষ Cloud আপডেট: '+(c.updated_at?new Date(c.updated_at).toLocaleString():'তথ্য নেই');
+      alert(msg);
+      status('Cloud হিসাব যাচাই সম্পন্ন — কোনো ডেটা পরিবর্তন হয়নি');
+    }catch(e){alert('Cloud হিসাব পড়া যায়নি: '+e.message);status('Cloud যাচাই ব্যর্থ: '+e.message)}
+  }
   async function reloadCloud(){if(!approved)return;try{const c=await rpc('etl_get_cloud_data',{p_device_id:deviceId});if(!c)return alert('Cloud-এ এখনো কোনো হিসাব নেই।');if(!confirm('Cloud-এর হিসাব এই ডিভাইসে বসাবেন? OK দিলে বর্তমান লোকাল হিসাবের JSON Backup ডাউনলোড হবে। Cancel করলে কোনো পরিবর্তন বা Backup হবে না।'))return;backupLocal();window.etlSetDb(c.payload);cloudVersion=c.updated_at;lastSyncedSnapshot=snapshot(c.payload);sessionReady=true;saveFirstSyncDecision('resolved');status('Cloud থেকে হিসাব আনা হয়েছে')}catch(e){alert('Cloud হিসাব আনা যায়নি: '+e.message)}}
   async function pushLocalToCloud(){if(!approved)return;try{const c=await rpc('etl_get_cloud_data',{p_device_id:deviceId});if(c){if(!confirm('Cloud-এ আগে থেকে হিসাব আছে। OK দিলে Cloud হিসাবের Backup ডাউনলোড হবে এবং এরপর এই ডিভাইসের লোকাল হিসাব দিয়ে Cloud প্রতিস্থাপন হবে। Cancel করলে কোনো Backup বা পরিবর্তন হবে না।'))return;backupCloud(c);cloudVersion=await rpc('etl_save_cloud_data',{p_device_id:deviceId,p_payload:localData(),p_expected_updated_at:c.updated_at})}else{if(!confirm('Cloud-এ হিসাব নেই। এই ডিভাইসের লোকাল হিসাব প্রথমবার Cloud-এ সংরক্ষণ করবেন?'))return;cloudVersion=await rpc('etl_save_cloud_data',{p_device_id:deviceId,p_payload:localData(),p_expected_updated_at:null})}lastSyncedSnapshot=snapshot(localData());sessionReady=true;saveFirstSyncDecision('resolved');status('লোকাল হিসাব Cloud-এ সংরক্ষিত হয়েছে')}catch(e){status('Cloud-এ পাঠানো যায়নি: '+e.message);alert('Cloud-এ পাঠানো যায়নি: '+e.message)}}
   async function checkRemote(){if(!client||!approved||!pollEnabled||!navigator.onLine||pollBusy)return;pollBusy=true;try{const remote=await rpc('etl_get_cloud_data',{p_device_id:deviceId});if(!remote||remote.updated_at===cloudVersion)return;const local=localData();if(same(local,lastSyncedSnapshot)){applyCloud(remote)}else{status('অন্য ডিভাইসে নতুন হিসাব আছে — Settings থেকে Cloud হিসাব আনুন; আপনার লোকাল পরিবর্তন মুছে ফেলা হয়নি।')}}catch(e){if(navigator.onLine)console.warn('Cloud refresh:',e.message)}finally{pollBusy=false}}
@@ -133,7 +148,10 @@
     if(!configured||!window.supabase?.createClient){status('Cloud key সেটআপ বাকি — লোকাল হিসাব চালু');const el=$('cloudDeviceList');if(el)el.textContent='Supabase key / library সেটআপের পর Cloud Sync চালু হবে।';return}
     client=window.supabase.createClient(cfg.url,cfg.anonKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
     $('etlSendEmail').onclick=sendEmail;$('etlSendPhone').onclick=sendPhone;$('etlVerifyOtp').onclick=verifyOtp;$('etlCheckApproval').onclick=finishLogin;$('etlTryAgain').onclick=finishLogin;
-    $('cloudRefreshDevices').onclick=refreshDevices;$('cloudReloadData').onclick=reloadCloud;$('cloudPushData').onclick=pushLocalToCloud;$('cloudSignOut').onclick=async()=>{if(confirm('এই ডিভাইস থেকে লগআউট করবেন?')){await client.auth.signOut();location.reload()}};
+    $('cloudRefreshDevices').onclick=refreshDevices;
+    const diagBtn=document.createElement('button');diagBtn.type='button';diagBtn.className='secondary';diagBtn.textContent='Cloud-এ কী হিসাব আছে দেখুন';diagBtn.onclick=inspectCloudData;
+    const reloadBtn=$('cloudReloadData');if(reloadBtn?.parentNode)reloadBtn.parentNode.insertBefore(diagBtn,reloadBtn);
+    $('cloudReloadData').onclick=reloadCloud;$('cloudPushData').onclick=pushLocalToCloud;$('cloudSignOut').onclick=async()=>{if(confirm('এই ডিভাইস থেকে লগআউট করবেন?')){await client.auth.signOut();location.reload()}};
     $('cloudSaveDeviceName').onclick=async()=>{const n=$('cloudDeviceName').value.trim();if(!n)return alert('ডিভাইসের নাম লিখুন।');localStorage.setItem(NAME_KEY,n);if(approved){try{await rpc('etl_register_device',{p_device_id:deviceId,p_device_name:n,p_platform:platform()});await refreshDevices();alert('ডিভাইসের নাম সংরক্ষিত হয়েছে।')}catch(e){alert(e.message)}}};
     $('cloudLinkEmailBtn').onclick=linkEmail;$('cloudLinkPhoneBtn').onclick=linkPhone;$('cloudVerifyLinkBtn').onclick=verifyLinked;
     const {data:{session}}=await client.auth.getSession();
