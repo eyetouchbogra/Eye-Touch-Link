@@ -1,9 +1,9 @@
-const CACHE = 'eye-touch-link-offline-v24';
+const CACHE = 'eye-touch-link-offline-v22';
 const REQUIRED = [
   './index.html',
   './supabase-config.js',
-  './cloud-sync.js?v=39',
-  './pin-lock.js?v=29'
+  './cloud-sync.js?v=37',
+  './pin-lock.js?v=26'
 ];
 const OPTIONAL = [
   './',
