@@ -1,13 +1,13 @@
-/* Eye Touch Link — offline app-shell cache v24
+/* Eye Touch Link — offline app-shell cache v25
  * The PIN gate is embedded in index.html. Do not require the unused pin-lock.js
  * file here: a missing optional file would reject cache.addAll() and prevent
  * this service worker from installing, breaking cold offline launches.
  */
-const CACHE = 'eye-touch-link-independent-accounts-v1';
+const CACHE = 'eye-touch-link-independent-accounts-v2';
 const REQUIRED = [
   './index.html',
   './supabase-config.js',
-  './cloud-sync.js?v=39'
+  './cloud-sync.js?v=41'
 ];
 const OPTIONAL = [
   './',
