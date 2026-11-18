@@ -165,7 +165,7 @@
   async function sendPhone(){const phone=$('etlLoginIdentity').value.trim();if(!/^\+[1-9]\d{7,14}$/.test(phone))return authMessage('ফোন নম্বর আন্তর্জাতিক ফরম্যাটে লিখুন, যেমন +8801XXXXXXXXX');const {error}=await client.auth.signInWithOtp({phone});if(error)return authMessage('OTP পাঠানো যায়নি: '+error.message);$('etlOtpArea').style.display='block';$('etlOtp').dataset.kind='sms';$('etlOtp').dataset.identity=phone;authMessage('ফোনে OTP পাঠানো হয়েছে। কোড লিখে যাচাই করুন।')}
   async function verifyOtp(){const token=$('etlOtp').value.trim(),kind=$('etlOtp').dataset.kind,identity=$('etlOtp').dataset.identity;if(!token||!identity)return authMessage('OTP কোড লিখুন।');const args=kind==='sms'?{phone:identity,token,type:'sms'}:{email:identity,token,type:'email'};const {error}=await client.auth.verifyOtp(args);if(error)return authMessage('OTP যাচাই হয়নি: '+error.message);await finishLogin()}
   async function inspectCloudData(){
-    if(!approved)return alert('এই ডিভাইসটি Cloud-এ অনুমোদিত নয়।');
+    if(!approved)return alert('আগে আপনার Gmail দিয়ে লগইন করুন।');
     try{
       status('Cloud-এর হিসাব শুধু পড়া হচ্ছে...');
       const c=await rpc('etl_get_cloud_data',{p_device_id:deviceId});
@@ -190,7 +190,7 @@
     const diagBtn=document.createElement('button');diagBtn.type='button';diagBtn.className='secondary';diagBtn.textContent='Cloud-এ কী হিসাব আছে দেখুন';diagBtn.onclick=inspectCloudData;const reloadBtn=$('cloudReloadData');if(reloadBtn?.parentNode)reloadBtn.parentNode.insertBefore(diagBtn,reloadBtn);
     $('cloudReloadData').onclick=reloadCloud;$('cloudPushData').onclick=pushLocalToCloud;$('cloudSignOut').onclick=async()=>{if(confirm('এই Gmail থেকে লগআউট করবেন?')){await client.auth.signOut();location.reload()}};
     const {data:{session}}=await client.auth.getSession();
-    if(session){gate(true);authMessage('আপনার ডিভাইস যাচাই করা হচ্ছে...');await finishLogin()}else{showArea('etlLoginFields');gate(true);status('Login প্রয়োজন')}
+    if(session){gate(true);authMessage('আপনার Gmail যাচাই করা হচ্ছে...');await finishLogin()}else{showArea('etlLoginFields');gate(true);status('Login প্রয়োজন')}
     client.auth.onAuthStateChange((event,session)=>{if(event==='SIGNED_IN'&&session){setTimeout(()=>finishLogin().catch(e=>{authMessage('Login সমস্যা: '+e.message)}),0)}if(event==='SIGNED_OUT'){approved=false;sessionReady=false;pollEnabled=false;currentUserId=null;loginResolvedUserId=null;deviceId=null;gate(true)}});
     setInterval(checkRemote,15000);
     window.addEventListener('online',()=>{checkRemote();if(approved&&sessionReady)queueSave(localData())});document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')checkRemote()});
