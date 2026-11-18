@@ -155,7 +155,7 @@ if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.se
     if(i>=sources.length){start();return;}
     var s=document.createElement('script');s.src=sources[i];s.onload=function(){if(window.supabase&&typeof window.supabase.createClient==='function')start();else load(i+1);};s.onerror=function(){load(i+1);};document.head.appendChild(s);
   }
-  function start(){if(window.__ETL_CLOUD_SYNC_STARTED)return;window.__ETL_CLOUD_SYNC_STARTED=true;var s=document.createElement('script');s.src='./cloud-sync.js?v=40';document.body.appendChild(s);}
+  function start(){if(window.__ETL_CLOUD_SYNC_STARTED)return;window.__ETL_CLOUD_SYNC_STARTED=true;var s=document.createElement('script');s.src='./cloud-sync.js?v=41';document.body.appendChild(s);}
   load(0);
 })();
 </script><script>
