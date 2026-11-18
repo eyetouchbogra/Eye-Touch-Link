@@ -7,13 +7,11 @@
   const $=id=>document.getElementById(id);
   const cfg=window.ETL_SUPABASE_CONFIG||{};
   const configured=!!(cfg.url&&cfg.anonKey&&cfg.anonKey!=='PASTE_SUPABASE_ANON_PUBLIC_KEY_HERE');
-  const DEVICE_KEY='etl_device_id_v1',DEVICE_OWNER_KEY='etl_device_owner_v1',NAME_KEY='etl_device_name_v1';
+  const DEVICE_KEY='etl_device_id_v1',DEVICE_OWNER_KEY='etl_device_owner_v1';
   const FIRST_SYNC_KEY='etl_first_sync_choice_v1';
   const makeDeviceId=()=>crypto.randomUUID?crypto.randomUUID():('etl-'+Date.now()+'-'+Math.random().toString(36).slice(2));
   let deviceId=localStorage.getItem(DEVICE_KEY);if(!deviceId){deviceId=makeDeviceId();localStorage.setItem(DEVICE_KEY,deviceId)}
   function selectDeviceForUser(userId){let owner=localStorage.getItem(DEVICE_OWNER_KEY);if(!owner){localStorage.setItem(DEVICE_OWNER_KEY,userId);return deviceId}if(owner===userId)return deviceId;const k=DEVICE_KEY+':'+userId;let id=localStorage.getItem(k);if(!id){id=makeDeviceId();localStorage.setItem(k,id)}return id}
-  const platform=()=>/Android/i.test(navigator.userAgent)?'Android':/iPhone|iPad/i.test(navigator.userAgent)?'iOS':/Windows/i.test(navigator.userAgent)?'Windows':'Web';
-  const deviceName=()=>localStorage.getItem(NAME_KEY)||(`${platform()} device`);
   let client=null,approved=false,saveTimer=null,cloudBusy=false,sessionReady=false,pollEnabled=false,cloudVersion=null,lastSyncedSnapshot=null,pollBusy=false,loginInProgress=false;
   let currentUserId=null,loginResolvedUserId=null;
   const firstSyncDecisionKey=()=>currentUserId?`${FIRST_SYNC_KEY}:${currentUserId}:${deviceId}`:null;
@@ -70,7 +68,7 @@
   const status=(msg)=>{const n=$('cloudStatusText');if(n)n.textContent=msg;const h=$('localSaveLabel');if(h)h.textContent=msg.includes('Sync')||msg.includes('সিঙ্ক')?'☁ Cloud Sync':msg.includes('Offline')||msg.includes('অফলাইন')?'● Offline':'☁ '+msg.slice(0,24)};
   const gate=(show)=>{const g=$('etlAuthGate');if(g)g.style.display=show?'flex':'none';const layout=document.querySelector('.layout'),top=document.querySelector('.top');if(layout)layout.style.visibility=show?'hidden':'visible';if(top)top.style.visibility=show?'hidden':'visible'};
   const authMessage=(m)=>{if($('etlAuthMessage'))$('etlAuthMessage').textContent=m};
-  const showArea=(which)=>{['etlLoginFields','etlPendingArea','etlDeniedArea'].forEach(id=>{if($(id))$(id).style.display=id===which?'block':'none'})};
+  const showArea=(which)=>{if($('etlLoginFields'))$('etlLoginFields').style.display=which==='etlLoginFields'?'block':'none'};
   const rpc=async(name,args)=>{const {data,error}=await client.rpc(name,args);if(error)throw error;return data};
   const localData=()=>window.etlGetDb?.()||null;
   const hasLocal=()=>{const d=localData();return !!(d&&(d.tx?.length||d.debts?.length||d.ledger?.length||d.people?.length))};
@@ -80,27 +78,6 @@
   function backupLocal(){const d=localData();if(d)downloadJson('Eye-Touch-Link-local-backup-'+new Date().toISOString().slice(0,10)+'.json',d)}
   function backupCloud(d){if(d?.payload)downloadJson('Eye-Touch-Link-cloud-backup-'+new Date().toISOString().slice(0,10)+'.json',d.payload)}
   function applyCloud(d){window.etlSetDb(d.payload);cloudVersion=d.updated_at;saveBaseline(d.payload);status('অন্য ডিভাইসের হিসাব Sync হয়েছে')}
-  async function refreshDevices(manual=false){
-    const el=$('cloudDeviceList');
-    if(!client){const msg='Cloud সংযোগ তৈরি হয়নি। পেজ রিফ্রেশ করে আবার চেষ্টা করুন।';if(el)el.textContent=msg;status(msg);return null;}
-    if(!approved){const msg='এই ডিভাইসটি এখন অনুমোদিত অবস্থায় নেই। আবার লগইন যাচাই করুন।';if(el)el.textContent=msg;status(msg);return null;}
-    if(!el)return null;
-    if(manual){el.textContent='ডিভাইস তালিকা রিফ্রেশ হচ্ছে…';status('ডিভাইস তালিকা রিফ্রেশ হচ্ছে…');}
-    try{
-      const rows=await rpc('etl_list_devices',{p_actor_device_id:deviceId});
-      if(!Array.isArray(rows))throw new Error('Supabase থেকে ডিভাইস তালিকার সঠিক ফল পাওয়া যায়নি।');
-      el.innerHTML=rows.map(d=>`<div class="device-row"><div class="device-meta"><b>${escapeHtml(d.device_name)} ${d.device_id===deviceId?'(এই ডিভাইস)':''}</b><small>${escapeHtml(d.platform)} · ${escapeHtml(d.status)} · শেষ ব্যবহার: ${d.last_seen_at?new Date(d.last_seen_at).toLocaleString():'—'}</small></div><div class="device-actions">${d.status==='pending'?`<button class="primary" data-approve-device="${escapeHtml(d.device_id)}">অনুমোদন</button>`:''}${d.status==='approved'&&d.device_id!==deviceId?`<button class="danger" data-revoke-device="${escapeHtml(d.device_id)}">প্রবেশ বাতিল</button>`:''}</div></div>`).join('')||'<div class="empty">কোনো ডিভাইস নেই।</div>';
-      el.querySelectorAll('[data-approve-device]').forEach(b=>b.onclick=async()=>{try{const ok=await rpc('etl_approve_device',{p_actor_device_id:deviceId,p_target_device_id:b.dataset.approveDevice});await refreshDevices();alert(ok?'ডিভাইস অনুমোদিত হয়েছে। নতুন ডিভাইসে “আবার যাচাই করুন” চাপুন।':'ডিভাইস অনুমোদন করা যায়নি; তালিকা রিফ্রেশ করুন।')}catch(e){alert(e.message)}});
-      el.querySelectorAll('[data-revoke-device]').forEach(b=>b.onclick=async()=>{if(!confirm('এই ডিভাইসের Cloud প্রবেশাধিকার বাতিল করবেন?'))return;try{await rpc('etl_revoke_device',{p_actor_device_id:deviceId,p_target_device_id:b.dataset.revokeDevice});await refreshDevices()}catch(e){alert(e.message)}});
-      if(manual){status(`ডিভাইস তালিকা আপডেট হয়েছে — ${rows.length}টি ডিভাইস`);}
-      return rows;
-    }catch(e){
-      const msg='ডিভাইস তালিকা পাওয়া যায়নি: '+(e?.message||String(e));
-      el.textContent=msg;status(msg);
-      if(manual)alert(msg);
-      return null;
-    }
-  }
   function escapeHtml(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
   async function resolveFirstSync(){
     const decisionKey=firstSyncDecisionKey();
@@ -172,19 +149,15 @@
     gate(true);
     currentUserId=user.id;
     try{window.etlSwitchAccount?.(user.id);deviceId=selectDeviceForUser(user.id)}catch(e){authMessage('এই Gmail-এর স্থানীয় হিসাব আলাদা করা যায়নি: '+e.message);gate(true);return}
-    let state;
-    try{state=await rpc('etl_register_device',{p_device_id:deviceId,p_device_name:deviceName(),p_platform:platform()})}
-    catch(e){authMessage('ডিভাইস নিবন্ধন হয়নি: '+e.message);gate(true);return}
-    if(state==='pending'){approved=false;sessionReady=false;pollEnabled=false;showArea('etlPendingArea');authMessage('এই ডিভাইসটি আপনার অন্য অনুমোদিত ডিভাইস থেকে অনুমোদন করুন।');gate(true);return}
-    if(state==='revoked'){approved=false;sessionReady=false;pollEnabled=false;showArea('etlDeniedArea');authMessage('এই ডিভাইসের প্রবেশাধিকার বাতিল করা হয়েছে।');gate(true);return}
+    // Each authenticated Supabase user owns an independent private ledger.
+    // No device registration or approval is required.
     approved=true;
     pollEnabled=true; // Read-only polling stays active when local/cloud conflict pauses automatic writes.
     try{
       await resolveFirstSync();
       loginResolvedUserId=user.id;
       gate(false);
-      if($('cloudDeviceName'))$('cloudDeviceName').value=deviceName();
-      await refreshDevices();
+
     }catch(e){status('Cloud সংযোগ সমস্যা: '+e.message);sessionReady=false;gate(false);}
     }finally{loginInProgress=false}
   }
@@ -213,17 +186,15 @@
   async function init(){
     if(!configured||!window.supabase?.createClient){status('Cloud key সেটআপ বাকি — লোকাল হিসাব চালু');const el=$('cloudDeviceList');if(el)el.textContent='Supabase key / library সেটআপের পর Cloud Sync চালু হবে।';return}
     client=window.supabase.createClient(cfg.url,cfg.anonKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
-    $('etlSendEmail').onclick=sendEmail;$('etlSendPhone').onclick=sendPhone;$('etlVerifyOtp').onclick=verifyOtp;$('etlCheckApproval').onclick=finishLogin;$('etlTryAgain').onclick=finishLogin;
+    $('etlSendEmail').onclick=sendEmail;$('etlSendPhone').onclick=sendPhone;$('etlVerifyOtp').onclick=verifyOtp;
     const diagBtn=document.createElement('button');diagBtn.type='button';diagBtn.className='secondary';diagBtn.textContent='Cloud-এ কী হিসাব আছে দেখুন';diagBtn.onclick=inspectCloudData;const reloadBtn=$('cloudReloadData');if(reloadBtn?.parentNode)reloadBtn.parentNode.insertBefore(diagBtn,reloadBtn);
-    $('cloudRefreshDevices').addEventListener('click',async ev=>{ev.preventDefault();const b=$('cloudRefreshDevices');if(b.dataset.busy==='1')return;b.dataset.busy='1';b.disabled=true;const old=b.textContent;b.textContent='রিফ্রেশ হচ্ছে…';try{await refreshDevices(true)}finally{b.disabled=false;b.textContent=old;delete b.dataset.busy}});$('cloudReloadData').onclick=reloadCloud;$('cloudPushData').onclick=pushLocalToCloud;$('cloudSignOut').onclick=async()=>{if(confirm('এই ডিভাইস থেকে লগআউট করবেন?')){await client.auth.signOut();location.reload()}};
-    $('cloudSaveDeviceName').onclick=async()=>{const n=$('cloudDeviceName').value.trim();if(!n)return alert('ডিভাইসের নাম লিখুন।');localStorage.setItem(NAME_KEY,n);if(approved){try{await rpc('etl_register_device',{p_device_id:deviceId,p_device_name:n,p_platform:platform()});await refreshDevices();alert('ডিভাইসের নাম সংরক্ষিত হয়েছে।')}catch(e){alert(e.message)}}};
+    $('cloudReloadData').onclick=reloadCloud;$('cloudPushData').onclick=pushLocalToCloud;$('cloudSignOut').onclick=async()=>{if(confirm('এই Gmail থেকে লগআউট করবেন?')){await client.auth.signOut();location.reload()}};
     const {data:{session}}=await client.auth.getSession();
     if(session){gate(true);authMessage('আপনার ডিভাইস যাচাই করা হচ্ছে...');await finishLogin()}else{showArea('etlLoginFields');gate(true);status('Login প্রয়োজন')}
     client.auth.onAuthStateChange((event,session)=>{if(event==='SIGNED_IN'&&session){setTimeout(()=>finishLogin().catch(e=>{authMessage('Login সমস্যা: '+e.message)}),0)}if(event==='SIGNED_OUT'){approved=false;sessionReady=false;pollEnabled=false;currentUserId=null;loginResolvedUserId=null;deviceId=null;gate(true)}});
     setInterval(checkRemote,15000);
-    const recheck=async()=>{if(!approved||!navigator.onLine)return;try{const st=await rpc('etl_register_device',{p_device_id:deviceId,p_device_name:deviceName(),p_platform:platform()});if(st!=='approved'){approved=false;sessionReady=false;showArea(st==='revoked'?'etlDeniedArea':'etlPendingArea');authMessage('এই ডিভাইসের অনুমোদন আর সক্রিয় নেই।');gate(true)}}catch(e){console.warn('Device approval check:',e.message)}};
-    window.addEventListener('online',()=>{recheck();checkRemote();if(approved&&sessionReady)queueSave(localData())});document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){recheck();checkRemote()}});
+    window.addEventListener('online',()=>{checkRemote();if(approved&&sessionReady)queueSave(localData())});document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')checkRemote()});
   }
-  window.etlCloud={init,queueSave,refreshDevices,deviceId};
+  window.etlCloud={init,queueSave,deviceId};
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
 })();
