@@ -148,7 +148,7 @@
     if(loginResolvedUserId===user.id)return;
     gate(true);
     currentUserId=user.id;
-    try{window.etlSwitchAccount?.(user.id);deviceId=selectDeviceForUser(user.id)}catch(e){authMessage('এই Gmail-এর স্থানীয় হিসাব আলাদা করা যায়নি: '+e.message);gate(true);return}
+    try{window.etlSwitchAccount?.(user.id,user.email);deviceId=selectDeviceForUser(user.id)}catch(e){authMessage('এই Gmail-এর স্থানীয় হিসাব আলাদা করা যায়নি: '+e.message);gate(true);return}
     // Each authenticated Supabase user owns an independent private ledger.
     // No device registration or approval is required.
     approved=true;
