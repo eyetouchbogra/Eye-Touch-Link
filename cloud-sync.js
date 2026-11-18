@@ -7,9 +7,11 @@
   const $=id=>document.getElementById(id);
   const cfg=window.ETL_SUPABASE_CONFIG||{};
   const configured=!!(cfg.url&&cfg.anonKey&&cfg.anonKey!=='PASTE_SUPABASE_ANON_PUBLIC_KEY_HERE');
-  const DEVICE_KEY='etl_device_id_v1',NAME_KEY='etl_device_name_v1';
+  const DEVICE_KEY='etl_device_id_v1',DEVICE_OWNER_KEY='etl_device_owner_v1',NAME_KEY='etl_device_name_v1';
   const FIRST_SYNC_KEY='etl_first_sync_choice_v1';
-  const deviceId=(()=>{let x=localStorage.getItem(DEVICE_KEY);if(!x){x=(crypto.randomUUID?crypto.randomUUID():('etl-'+Date.now()+'-'+Math.random().toString(36).slice(2)));localStorage.setItem(DEVICE_KEY,x)}return x})();
+  const makeDeviceId=()=>crypto.randomUUID?crypto.randomUUID():('etl-'+Date.now()+'-'+Math.random().toString(36).slice(2));
+  let deviceId=localStorage.getItem(DEVICE_KEY);if(!deviceId){deviceId=makeDeviceId();localStorage.setItem(DEVICE_KEY,deviceId)}
+  function selectDeviceForUser(userId){let owner=localStorage.getItem(DEVICE_OWNER_KEY);if(!owner){localStorage.setItem(DEVICE_OWNER_KEY,userId);return deviceId}if(owner===userId)return deviceId;const k=DEVICE_KEY+':'+userId;let id=localStorage.getItem(k);if(!id){id=makeDeviceId();localStorage.setItem(k,id)}return id}
   const platform=()=>/Android/i.test(navigator.userAgent)?'Android':/iPhone|iPad/i.test(navigator.userAgent)?'iOS':/Windows/i.test(navigator.userAgent)?'Windows':'Web';
   const deviceName=()=>localStorage.getItem(NAME_KEY)||(`${platform()} device`);
   let client=null,approved=false,saveTimer=null,cloudBusy=false,sessionReady=false,pollEnabled=false,cloudVersion=null,lastSyncedSnapshot=null,pollBusy=false,loginInProgress=false;
@@ -99,32 +101,6 @@
       return null;
     }
   }
-  async function refreshMembers(manual=false){
-    const el=$('cloudMemberList');if(!el)return;
-    if(!client||!approved){el.textContent='মূল ডিভাইসে Cloud Login করার পর Gmail তালিকা দেখা যাবে।';return null;}
-    if(manual)el.textContent='Gmail তালিকা আপডেট হচ্ছে…';
-    try{
-      const rows=await rpc('etl_list_members',{p_actor_device_id:deviceId});
-      el.innerHTML=rows.map(m=>`<div class="device-row"><div class="device-meta"><b>${escapeHtml(m.invited_email)}</b><small>${m.status==='active'?'ব্যবহারকারী যুক্ত হয়েছে':m.status==='invited'?'ডিভাইসে Login করার অপেক্ষায়':'প্রবেশ বাতিল'} · ${m.created_at?new Date(m.created_at).toLocaleDateString():''}</small></div><div class="device-actions">${m.status!=='revoked'?`<button class="danger" data-revoke-member="${escapeHtml(m.invited_email)}">Gmail বাতিল</button>`:''}</div></div>`).join('')||'<div class="empty">এখনো অন্য কোনো Gmail অনুমোদন করা হয়নি।</div>';
-      el.querySelectorAll('[data-revoke-member]').forEach(b=>b.onclick=async()=>{if(!confirm(b.dataset.revokeMember+' — এই Gmail-এর Cloud প্রবেশাধিকার বাতিল করবেন?'))return;try{await rpc('etl_revoke_member',{p_actor_device_id:deviceId,p_email:b.dataset.revokeMember});await refreshMembers(true);await refreshDevices();alert('এই Gmail-এর প্রবেশাধিকার বাতিল হয়েছে।')}catch(e){alert('Gmail বাতিল করা যায়নি: '+e.message)}});
-      return rows;
-    }catch(e){
-      const msg=String(e?.message||e);
-      el.textContent=msg.includes('Only the owner')?'Gmail অনুমোদন ও বাতিল করার সুবিধা শুধু মূল Gmail-এর অনুমোদিত ডিভাইসে পাওয়া যাবে।':'Gmail তালিকা পাওয়া যায়নি: '+msg;
-      return null;
-    }
-  }
-  async function inviteEmail(){
-    const email=$('cloudInviteEmail')?.value.trim().toLowerCase();
-    if(!email||!/^\S+@\S+\.\S+$/.test(email))return alert('সঠিক Gmail / ইমেইল লিখুন।');
-    const b=$('cloudInviteEmailBtn');if(b)b.disabled=true;
-    try{
-      const state=await rpc('etl_invite_email',{p_actor_device_id:deviceId,p_email:email});
-      if($('cloudInviteEmail'))$('cloudInviteEmail').value='';
-      await refreshMembers(true);
-      alert(state==='active'?'এই Gmail আগে থেকেই যুক্ত আছে।':'Gmail অনুমোদনের তালিকায় যোগ হয়েছে। এখন অন্য ডিভাইসে এই Gmail দিয়ে Login Link নিতে পারবেন।');
-    }catch(e){alert('Gmail যোগ করা যায়নি: '+e.message)}finally{if(b)b.disabled=false}
-  }
   function escapeHtml(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
   async function resolveFirstSync(){
     const decisionKey=firstSyncDecisionKey();
@@ -193,7 +169,9 @@
     const {data:{user}}=await client.auth.getUser();
     if(!user){currentUserId=null;gate(true);return}
     if(loginResolvedUserId===user.id)return;
+    gate(true);
     currentUserId=user.id;
+    try{window.etlSwitchAccount?.(user.id);deviceId=selectDeviceForUser(user.id)}catch(e){authMessage('এই Gmail-এর স্থানীয় হিসাব আলাদা করা যায়নি: '+e.message);gate(true);return}
     let state;
     try{state=await rpc('etl_register_device',{p_device_id:deviceId,p_device_name:deviceName(),p_platform:platform()})}
     catch(e){authMessage('ডিভাইস নিবন্ধন হয়নি: '+e.message);gate(true);return}
@@ -207,7 +185,6 @@
       gate(false);
       if($('cloudDeviceName'))$('cloudDeviceName').value=deviceName();
       await refreshDevices();
-      await refreshMembers();
     }catch(e){status('Cloud সংযোগ সমস্যা: '+e.message);sessionReady=false;gate(false);}
     }finally{loginInProgress=false}
   }
@@ -240,10 +217,9 @@
     const diagBtn=document.createElement('button');diagBtn.type='button';diagBtn.className='secondary';diagBtn.textContent='Cloud-এ কী হিসাব আছে দেখুন';diagBtn.onclick=inspectCloudData;const reloadBtn=$('cloudReloadData');if(reloadBtn?.parentNode)reloadBtn.parentNode.insertBefore(diagBtn,reloadBtn);
     $('cloudRefreshDevices').addEventListener('click',async ev=>{ev.preventDefault();const b=$('cloudRefreshDevices');if(b.dataset.busy==='1')return;b.dataset.busy='1';b.disabled=true;const old=b.textContent;b.textContent='রিফ্রেশ হচ্ছে…';try{await refreshDevices(true)}finally{b.disabled=false;b.textContent=old;delete b.dataset.busy}});$('cloudReloadData').onclick=reloadCloud;$('cloudPushData').onclick=pushLocalToCloud;$('cloudSignOut').onclick=async()=>{if(confirm('এই ডিভাইস থেকে লগআউট করবেন?')){await client.auth.signOut();location.reload()}};
     $('cloudSaveDeviceName').onclick=async()=>{const n=$('cloudDeviceName').value.trim();if(!n)return alert('ডিভাইসের নাম লিখুন।');localStorage.setItem(NAME_KEY,n);if(approved){try{await rpc('etl_register_device',{p_device_id:deviceId,p_device_name:n,p_platform:platform()});await refreshDevices();alert('ডিভাইসের নাম সংরক্ষিত হয়েছে।')}catch(e){alert(e.message)}}};
-    $('cloudInviteEmailBtn').onclick=inviteEmail;
     const {data:{session}}=await client.auth.getSession();
     if(session){gate(true);authMessage('আপনার ডিভাইস যাচাই করা হচ্ছে...');await finishLogin()}else{showArea('etlLoginFields');gate(true);status('Login প্রয়োজন')}
-    client.auth.onAuthStateChange((event,session)=>{if(event==='SIGNED_IN'&&session){setTimeout(()=>finishLogin().catch(e=>{authMessage('Login সমস্যা: '+e.message)}),0)}if(event==='SIGNED_OUT'){approved=false;sessionReady=false;pollEnabled=false;currentUserId=null;loginResolvedUserId=null;gate(true)}});
+    client.auth.onAuthStateChange((event,session)=>{if(event==='SIGNED_IN'&&session){setTimeout(()=>finishLogin().catch(e=>{authMessage('Login সমস্যা: '+e.message)}),0)}if(event==='SIGNED_OUT'){approved=false;sessionReady=false;pollEnabled=false;currentUserId=null;loginResolvedUserId=null;deviceId=null;gate(true)}});
     setInterval(checkRemote,15000);
     const recheck=async()=>{if(!approved||!navigator.onLine)return;try{const st=await rpc('etl_register_device',{p_device_id:deviceId,p_device_name:deviceName(),p_platform:platform()});if(st!=='approved'){approved=false;sessionReady=false;showArea(st==='revoked'?'etlDeniedArea':'etlPendingArea');authMessage('এই ডিভাইসের অনুমোদন আর সক্রিয় নেই।');gate(true)}}catch(e){console.warn('Device approval check:',e.message)}};
     window.addEventListener('online',()=>{recheck();checkRemote();if(approved&&sessionReady)queueSave(localData())});document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){recheck();checkRemote()}});
