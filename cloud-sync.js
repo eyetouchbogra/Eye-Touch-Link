@@ -184,7 +184,41 @@
   async function checkRemote(){if(!client||!approved||!pollEnabled||!navigator.onLine||pollBusy)return;pollBusy=true;try{const remote=await rpc('etl_get_cloud_data',{p_device_id:deviceId});if(!remote||remote.updated_at===cloudVersion)return;const local=localData();if(same(local,lastSyncedSnapshot)){applyCloud(remote);return}if(sessionReady&&lastSyncedSnapshot){try{await reconcileWithRemote(remote,local)}catch(e){status('অন্য ডিভাইসে পরিবর্তন হয়েছে; স্বয়ংক্রিয় মিলানোর চেষ্টা চলছে: '+e.message)}}else{status('প্রথম Sync সম্পন্ন করুন; কোনো হিসাব মুছে ফেলা হয়নি।')}}catch(e){if(navigator.onLine)console.warn('Cloud refresh:',e.message)}finally{pollBusy=false}}
   function queueSave(data){if(!configured||!client||!approved||!sessionReady)return;clearTimeout(saveTimer);saveTimer=setTimeout(async()=>{if(cloudBusy){queueSave(localData());return}cloudBusy=true;try{let payload=data;try{cloudVersion=await rpc('etl_save_cloud_data',{p_device_id:deviceId,p_payload:payload,p_expected_updated_at:cloudVersion})}catch(err){if(!String(err?.message||'').includes('CLOUD_CONFLICT'))throw err;const remote=await rpc('etl_get_cloud_data',{p_device_id:deviceId});if(!remote||!lastSyncedSnapshot)throw err;let base;try{base=JSON.parse(lastSyncedSnapshot)}catch(_){throw err}payload=mergeRecords(base,localData()||{},remote.payload||{});cloudVersion=await rpc('etl_save_cloud_data',{p_device_id:deviceId,p_payload:payload,p_expected_updated_at:remote.updated_at});if(!same(localData(),payload))window.etlSetDb(payload)}saveBaseline(payload);status('Cloud সিঙ্ক সম্পন্ন')}catch(e){status(e.message.includes('CLOUD_CONFLICT')?'অন্য ডিভাইসের পরিবর্তনের সঙ্গে Sync আটকে আছে; ডেটা মুছে ফেলা হয়নি':'অফলাইন / Sync অপেক্ষমাণ');console.warn('Eye Touch Link cloud save:',e.message)}finally{cloudBusy=false}},900)}
   async function init(){
-    if(!configured||!window.supabase?.createClient){status('Cloud key সেটআপ বাকি — লোকাল হিসাব চালু');const el=$('cloudDeviceList');if(el)el.textContent='Supabase key / library সেটআপের পর Cloud Sync চালু হবে।';return}
+    if(!configured){
+      status('অফলাইন — লোকাল হিসাব চালু');
+      gate(false);
+      const el=$('cloudDeviceList');if(el)el.textContent='Cloud Sync চালু করতে ইন্টারনেট ও Supabase configuration প্রয়োজন।';
+      return;
+    }
+    if(!window.supabase?.createClient){
+      // The ledger remains usable offline even when the Supabase CDN is unreachable.
+      // Once connectivity returns, load the library and initialize Cloud Sync without reloading the app.
+      status('অফলাইন — লোকাল হিসাব চালু');
+      gate(false);
+      let retrying=false;
+      const retryCloudInit=()=>{
+        if(!navigator.onLine||window.supabase?.createClient||retrying)return;
+        retrying=true;
+        const sources=['https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2','https://unpkg.com/@supabase/supabase-js@2'];
+        const load=(i)=>{
+          if(window.supabase?.createClient){
+            window.removeEventListener('online',retryCloudInit);
+            retrying=false;
+            init();
+            return;
+          }
+          if(i>=sources.length){retrying=false;return;}
+          const script=document.createElement('script');
+          script.src=sources[i];
+          script.onload=()=>{if(window.supabase?.createClient){window.removeEventListener('online',retryCloudInit);retrying=false;init()}else load(i+1)};
+          script.onerror=()=>load(i+1);
+          document.head.appendChild(script);
+        };
+        load(0);
+      };
+      window.addEventListener('online',retryCloudInit);
+      return;
+    }
     client=window.supabase.createClient(cfg.url,cfg.anonKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
     $('etlSendEmail').onclick=sendEmail;$('etlSendPhone').onclick=sendPhone;$('etlVerifyOtp').onclick=verifyOtp;
     const diagBtn=document.createElement('button');diagBtn.type='button';diagBtn.className='secondary';diagBtn.textContent='Cloud-এ কী হিসাব আছে দেখুন';diagBtn.onclick=inspectCloudData;const reloadBtn=$('cloudReloadData');if(reloadBtn?.parentNode)reloadBtn.parentNode.insertBefore(diagBtn,reloadBtn);
