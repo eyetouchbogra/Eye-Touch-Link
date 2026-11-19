@@ -147,16 +147,16 @@ window.etlGetDb=()=>db;window.etlSetDb=(v)=>{if(!v||!Array.isArray(v.tx)||!Array
 })();
 if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));}
 </script><script src="./supabase-config.js"></script><script>
-/* Load Supabase JS from primary CDN, then fallback CDN before starting Cloud Sync. */
+/* Start local/offline Cloud Sync controller immediately; it loads Supabase only when available. */
 (function(){
-  var sources=['https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2','https://unpkg.com/@supabase/supabase-js@2'];
-  function load(i){
-    if(window.supabase && typeof window.supabase.createClient==='function'){start();return;}
-    if(i>=sources.length){start();return;}
-    var s=document.createElement('script');s.src=sources[i];s.onload=function(){if(window.supabase&&typeof window.supabase.createClient==='function')start();else load(i+1);};s.onerror=function(){load(i+1);};document.head.appendChild(s);
+  function start(){
+    if(window.__ETL_CLOUD_SYNC_STARTED)return;
+    window.__ETL_CLOUD_SYNC_STARTED=true;
+    var s=document.createElement('script');
+    s.src='./cloud-sync.js?v=43';
+    document.body.appendChild(s);
   }
-  function start(){if(window.__ETL_CLOUD_SYNC_STARTED)return;window.__ETL_CLOUD_SYNC_STARTED=true;var s=document.createElement('script');s.src='./cloud-sync.js?v=42';document.body.appendChild(s);}
-  load(0);
+  start();
 })();
 </script><script>
 /* Eye Touch Link: per-device PIN gate. This is a local access screen, not cloud account authentication. */
