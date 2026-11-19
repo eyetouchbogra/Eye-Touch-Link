@@ -217,6 +217,9 @@
         load(0);
       };
       window.addEventListener('online',retryCloudInit);
+      // Also attempt immediately when the app starts online; the HTML loader
+      // no longer blocks the local app while waiting for the CDN.
+      if(navigator.onLine)retryCloudInit();
       return;
     }
     client=window.supabase.createClient(cfg.url,cfg.anonKey,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
