@@ -3,11 +3,11 @@
  * file here: a missing optional file would reject cache.addAll() and prevent
  * this service worker from installing, breaking cold offline launches.
  */
-const CACHE = 'eye-touch-link-offline-local-v3';
+const CACHE = 'eye-touch-link-offline-local-v4';
 const REQUIRED = [
   './index.html',
   './supabase-config.js',
-  './cloud-sync.js?v=42'
+  './cloud-sync.js?v=43'
 ];
 const OPTIONAL = [
   './',
